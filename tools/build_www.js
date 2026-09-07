@@ -10,6 +10,7 @@ const COPY_FILES = [
   'index.html',
   'app.css',
   'app.js',
+  'recommendation.js',
   'store.js',
   'manifest.webmanifest',
   'sw.js',

@@ -13,6 +13,7 @@ var esc = function (s) {
 };
 var C = window.CONTENT;
 var STORE = window.SHULIU_STORE;
+var RECOMMENDER = window.SHULIU_RECOMMENDER;
 var TOPICS = ['自我认识', '亲密关系', '孤独与陪伴', '成长与选择', '情绪与压力', '人性与社会'];
 var BOOK = {};
 C.books.forEach(function (b) { BOOK[b.bookId] = b; });
@@ -38,7 +39,7 @@ var DEFAULTS = {
   onboarded: false, interests: [],
   likes: {}, saves: {}, commentLikes: {},
   publishes: [], history: {}, hidden: [],
-  feed: null
+  feed: null, topicWeights: {}, recEvents: []
 };
 var S = {};
 function loadState() {
@@ -51,7 +52,9 @@ function loadState() {
     publishes: STORE.get('publishes', DEFAULTS.publishes),
     history: STORE.get('history', DEFAULTS.history),
     hidden: STORE.get('hidden', DEFAULTS.hidden),
-    feed: STORE.get('feed', DEFAULTS.feed)
+    feed: STORE.get('feed', DEFAULTS.feed),
+    topicWeights: STORE.get('topicWeights', DEFAULTS.topicWeights),
+    recEvents: STORE.get('recEvents', DEFAULTS.recEvents)
   };
 }
 function persist(key) {
@@ -61,6 +64,15 @@ function persist(key) {
     return false;
   }
   return true;
+}
+function recordRecommendationFeedback(type, passage) {
+  if (!RECOMMENDER || !passage) return;
+  var user = { interests: S.interests, topicWeights: S.topicWeights, liked: Object.keys(S.likes), saved: Object.keys(S.saves), hidden: S.hidden, seen: Object.keys(S.history), events: S.recEvents };
+  var next = RECOMMENDER.applyFeedback(user, { type: type, passage: passage });
+  S.topicWeights = next.topicWeights;
+  S.recEvents = next.events;
+  persist('topicWeights');
+  persist('recEvents');
 }
 loadState();
 
@@ -88,11 +100,8 @@ function mixPool(match, other) {
 }
 function buildFullOrder() {
   var vis = visiblePassages();
-  var match = [], other = [];
-  vis.forEach(function (p) {
-    (S.interests.some(function (t) { return p.topics.indexOf(t) >= 0; }) ? match : other).push('p:' + p.passageId);
-  });
-  return mixPool(shuffle(match), shuffle(other));
+  var user = { interests: S.interests, topicWeights: S.topicWeights, liked: Object.keys(S.likes), saved: Object.keys(S.saves), hidden: S.hidden, seen: Object.keys(S.history) };
+  return RECOMMENDER.buildFeed(vis, user, { limit: vis.length }).map(function (p) { return 'p:' + p.passageId; });
 }
 function ensureFeed() {
   if (!S.feed || !S.feed.order || !S.feed.order.length) {
@@ -110,11 +119,8 @@ function rebuildTail(opts) {
   viewed.forEach(function (id) { viewedSet[id] = 1; });
   var keep = S.feed.order.slice(keepN).filter(function (id) { return id.charAt(0) === 'u'; });
   var vis = visiblePassages().filter(function (p) { return !viewedSet['p:' + p.passageId]; });
-  var match = [], other = [];
-  vis.forEach(function (p) {
-    (S.interests.some(function (t) { return p.topics.indexOf(t) >= 0; }) ? match : other).push('p:' + p.passageId);
-  });
-  var tail = mixPool(shuffle(match), shuffle(other));
+  var user = { interests: S.interests, topicWeights: S.topicWeights, liked: Object.keys(S.likes), saved: Object.keys(S.saves), hidden: S.hidden, seen: viewed.map(function (id) { return id.slice(2); }) };
+  var tail = RECOMMENDER.buildFeed(vis, user, { limit: vis.length }).map(function (p) { return 'p:' + p.passageId; });
   tail = keep.concat(tail);
   if (opts && opts.insertFirst) { tail = opts.insertFirst.concat(tail); }
   S.feed.order = viewed.concat(tail);
@@ -313,7 +319,7 @@ function bindFeedOnce(scope) {
     var act = btn.dataset.act;
     if (act === 'go-src' || act === 'go-src2') {
       if (item.kind === 'publish') go('pubdetail', { id: item.pub.id });
-      else go('reader', { chapterId: item.p.chapterId, passageId: item.p.passageId });
+      else { recordRecommendationFeedback('open_original', item.p); go('reader', { chapterId: item.p.chapterId, passageId: item.p.passageId }); }
     } else if (act === 'like') { toggleLike(item.p.passageId, btn); }
     else if (act === 'save') { toggleSave(item.p.passageId, btn); }
     else if (act === 'comment') { openComments(item.p.passageId); }
@@ -447,6 +453,7 @@ function toggleLike(pid, btn) {
   var was = !!S.likes[pid];
   if (was) delete S.likes[pid]; else S.likes[pid] = Date.now();
   if (persist('likes')) {
+    if (!was) recordRecommendationFeedback('like', PASSAGE[pid]);
     btn.classList.toggle('on', !was);
     toast(was ? '已取消喜欢' : '已喜欢');
   } else { loadState(); }
@@ -455,6 +462,7 @@ function toggleSave(pid, btn) {
   var was = !!S.saves[pid];
   if (was) delete S.saves[pid]; else S.saves[pid] = Date.now();
   if (persist('saves')) {
+    if (!was) recordRecommendationFeedback('save', PASSAGE[pid]);
     btn.classList.toggle('on', !was);
     toast(was ? '已取消收藏' : '已收藏');
   } else { loadState(); }
@@ -476,6 +484,7 @@ function moreMenu(item) {
       var pid = item.p.passageId;
       S.hidden.push(pid);
       if (persist('hidden')) {
+        recordRecommendationFeedback('not_interested', item.p);
         var sc = top();
         rebuildTail();
         toast('已隐藏这条片段', 2600);
