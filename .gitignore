@@ -1,0 +1,22 @@
+node_modules/
+
+# Android build outputs and local machine settings
+android/.gradle/
+android/local.properties
+android/**/build/
+*.apk
+*.aab
+
+# Signing keys and credentials
+*.keystore
+*.jks
+keystore.properties
+
+# Generated test artifacts
+验收截图/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -1,0 +1,58 @@
+[
+ {
+  "chapterId": "hlm-03",
+  "bookId": "hlm",
+  "number": 3,
+  "title": "第三回 贾雨村夤缘复旧职　林黛玉抛父进京都",
+  "paragraphs": 38,
+  "chars": 7981
+ },
+ {
+  "chapterId": "hlm-23",
+  "bookId": "hlm",
+  "number": 23,
+  "title": "第二十三回 西厢记妙词通戏语　牡丹亭艳曲警芳心",
+  "paragraphs": 31,
+  "chars": 5270
+ },
+ {
+  "chapterId": "hlm-27",
+  "bookId": "hlm",
+  "number": 27,
+  "title": "第二十七回 滴翠亭杨妃戏彩蝶　埋香冢飞燕泣残红",
+  "paragraphs": 23,
+  "chars": 6395
+ },
+ {
+  "chapterId": "hlm-32",
+  "bookId": "hlm",
+  "number": 32,
+  "title": "第三十二回 诉肺腑心迷活宝玉　含耻辱情烈死金钏",
+  "paragraphs": 19,
+  "chars": 5844
+ },
+ {
+  "chapterId": "xyj-01",
+  "bookId": "xyj",
+  "number": 1,
+  "title": "第一回　灵根育孕源流出　心性修持大道生",
+  "paragraphs": 49,
+  "chars": 6985
+ },
+ {
+  "chapterId": "xyj-14",
+  "bookId": "xyj",
+  "number": 14,
+  "title": "第十四回　心猿归正　六贼无踪",
+  "paragraphs": 33,
+  "chars": 8507
+ },
+ {
+  "chapterId": "xyj-27",
+  "bookId": "xyj",
+  "number": 27,
+  "title": "第二十七回　尸魔三戏唐三藏　圣僧恨逐美猴王",
+  "paragraphs": 28,
+  "chars": 7079
+ }
+]

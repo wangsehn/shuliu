@@ -1,0 +1,188 @@
+/* 书流 首版原型样式 —— 遵循 ui/UI设计说明.md V1.0 规范
+   色彩：纸白 #F8F7F2 / 墨灰 #303A35 / 松绿 #547366 / 淡绿 #E4EBE3
+   正文：宋体 20px；操作与标注：黑体。支持 ?vp=WxH 设备框模拟视口。 */
+:root{
+  --paper:#F8F7F2; --ink:#303A35; --pine:#547366; --pale:#E4EBE3;
+  --sub:#6D786F; --line:#DDE2D9; --card:#FFFFFF; --mark:#DCE8DC;
+  --r-s:6px; --r-m:14px; --r-l:28px;
+  --s1:8px; --s2:16px; --s3:24px; --s4:32px; --s5:48px;
+  --song:"Songti SC","Noto Serif SC","SimSun",serif;
+  --hei:"PingFang SC","Microsoft YaHei","Helvetica Neue",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{background:#202623;font-family:var(--hei);color:var(--ink);display:flex;justify-content:center;align-items:center}
+#phone{position:relative;width:100vw;height:100vh;max-width:100vw;background:var(--paper);overflow:hidden}
+body.vp-frame #phone{width:var(--vp-w);height:var(--vp-h);border-radius:24px;box-shadow:0 0 0 10px #111,0 30px 80px rgba(0,0,0,.5)}
+#app{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--paper)}
+
+/* ---------- 通用 ---------- */
+button{font-family:var(--hei);border:0;background:none;color:inherit;cursor:pointer}
+.page{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--paper);animation:fin .22s ease}
+@keyframes fin{from{opacity:.4;transform:translateX(14px)}to{opacity:1;transform:none}}
+.topbar{flex:0 0 auto;display:flex;align-items:center;gap:var(--s2);padding:calc(env(safe-area-inset-top,0px) + 14px) 20px 12px;border-bottom:1px solid var(--line);background:var(--paper)}
+.topbar .back{font-size:22px;line-height:1;padding:6px 8px 6px 0;color:var(--ink)}
+.topbar .tt{font-size:16px;font-weight:600}
+.topbar .crumb{font-size:13px;color:var(--sub)}
+.scroll{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch}
+
+/* ---------- 底部导航 ---------- */
+.nav{flex:0 0 auto;display:flex;border-top:1px solid var(--line);background:var(--paper);padding-bottom:env(safe-area-inset-bottom,0px)}
+.nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 0 8px;font-size:11px;color:var(--sub)}
+.nav button.on{color:var(--pine)}
+.nav button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8}
+
+/* ---------- 兴趣选择（PG-01） ---------- */
+.start{display:flex;flex-direction:column;height:100%;padding:var(--s5) var(--s3) var(--s3)}
+.start h1{font-family:var(--song);font-size:30px;font-weight:700;line-height:1.5}
+.start .why{margin-top:var(--s2);font-size:14px;color:var(--sub);line-height:1.8}
+.chips{margin:var(--s4) 0;display:flex;flex-wrap:wrap;gap:12px}
+.chip{padding:12px 20px;border-radius:var(--r-l);border:1px solid var(--line);background:var(--card);font-size:16px;color:var(--ink)}
+.chip.on{background:var(--pine);border-color:var(--pine);color:#fff}
+.chip-note{font-size:12px;color:var(--sub)}
+.start .go{margin-top:auto;display:flex;flex-direction:column;gap:10px}
+.btn-p{padding:16px;border-radius:var(--r-m);background:var(--pine);color:#fff;font-size:17px;font-weight:600}
+.btn-p:disabled{opacity:.35}
+.btn-g{padding:14px;border-radius:var(--r-m);border:1px solid var(--line);background:var(--card);font-size:15px;color:var(--ink)}
+
+/* ---------- 首页书流（PG-02） ---------- */
+.home{display:flex;flex-direction:column;height:100%}
+.resume{flex:0 0 auto;margin:10px 16px 0;padding:12px 16px;border-radius:var(--r-m);background:var(--pale);display:flex;align-items:center;gap:10px;width:auto;text-align:left}
+.resume .l1{font-size:14px;font-weight:600;color:var(--ink)}
+.resume .l2{font-size:12px;color:var(--sub);margin-top:2px}
+.resume .arr{margin-left:auto;color:var(--pine);font-size:18px}
+.feed{flex:1;position:relative;overflow:hidden}
+.cardwrap{position:absolute;inset:0;display:flex;flex-direction:column;padding:14px 16px 0;transition:transform .28s ease,opacity .28s ease}
+.cardwrap.out-up{transform:translateY(-36%);opacity:0}
+.cardwrap.in-down{transform:translateY(36%);opacity:0}
+.card{flex:1;display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:var(--r-m);padding:var(--s3) var(--s2) var(--s2);overflow:hidden}
+.card .kicker{font-size:12px;letter-spacing:.14em;color:var(--pine);font-weight:600}
+.card .body{flex:1;display:flex;align-items:center;overflow:hidden}
+.card .text{font-family:var(--song);font-size:20px;line-height:2;color:var(--ink);white-space:pre-wrap}
+.card .src{padding-top:var(--s2);border-top:1px solid var(--line);display:flex;align-items:baseline;gap:8px}
+.card .src .bt{font-size:14px;font-weight:600}
+.card .src .ct{font-size:12px;color:var(--sub)}
+.card .src .go{margin-left:auto;font-size:13px;color:var(--pine);font-weight:600}
+.actions{flex:0 0 auto;display:flex;justify-content:space-around;align-items:center;padding:10px 6px 12px}
+.actions button{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:var(--sub);padding:4px 10px}
+.actions svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8}
+.actions button.on{color:var(--pine)}
+.actions button.on svg{fill:var(--pine)}
+.deck-dots{flex:0 0 auto;display:flex;justify-content:center;gap:6px;padding:0 0 8px}
+.deck-dots i{width:6px;height:6px;border-radius:50%;background:var(--line)}
+.deck-dots i.on{background:var(--pine)}
+.hint-swipe{text-align:center;font-size:11px;color:var(--sub);padding-bottom:6px}
+
+/* 轮末页 */
+.endround{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:var(--s4);text-align:center;gap:var(--s3)}
+.endround h2{font-family:var(--song);font-size:24px}
+.endround p{font-size:14px;color:var(--sub);line-height:1.8}
+.endround .col{display:flex;flex-direction:column;gap:12px;width:100%;max-width:280px}
+
+/* ---------- 章节列表（本书精选 PG-04） ---------- */
+.bk-head{padding:var(--s3) var(--s2) var(--s2)}
+.bk-head h2{font-family:var(--song);font-size:22px}
+.bk-head .meta{font-size:13px;color:var(--sub);margin-top:4px}
+.ps-list{display:flex;flex-direction:column;gap:12px;padding:0 16px var(--s3)}
+.ps-item{text-align:left;background:var(--card);border:1px solid var(--line);border-radius:var(--r-m);padding:14px 16px}
+.ps-item .p{font-family:var(--song);font-size:15px;line-height:1.9;color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ps-item .m{margin-top:8px;font-size:12px;color:var(--sub)}
+.ch-list{padding:0 16px var(--s3);display:flex;flex-direction:column;gap:10px}
+.ch-item{text-align:left;display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:var(--r-m);padding:14px 16px;font-size:15px}
+.ch-item .n{color:var(--sub);font-size:13px;flex:0 0 auto}
+.ch-item.pd .n{color:var(--pine)}
+
+/* ---------- 原文阅读（PG-03） ---------- */
+.reader .scroll{padding:18px 20px calc(120px + env(safe-area-inset-bottom,0px))}
+.reader .para{font-family:var(--song);font-size:20px;line-height:2.1;margin-bottom:1.2em;color:var(--ink)}
+.reader .para mark{background:var(--mark);color:inherit;border-radius:2px;box-shadow:0 0 0 2px var(--mark)}
+.reader .chapter-t{font-family:var(--song);font-size:17px;color:var(--sub);text-align:center;margin-bottom:1.6em}
+.locate-note{position:absolute;left:50%;bottom:120px;transform:translateX(-50%);background:var(--ink);color:#fff;font-size:13px;padding:10px 18px;border-radius:var(--r-l);white-space:nowrap;z-index:5;opacity:.94}
+.reader-tools{position:absolute;left:0;right:0;bottom:0;display:flex;gap:10px;justify-content:center;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:linear-gradient(transparent,var(--paper) 40%)}
+.tool-btn{display:flex;align-items:center;gap:6px;padding:10px 18px;border-radius:var(--r-l);background:var(--card);border:1px solid var(--line);font-size:14px;color:var(--ink);box-shadow:0 2px 8px rgba(48,58,53,.08)}
+.tool-btn.pri{background:var(--pine);border-color:var(--pine);color:#fff}
+.tool-btn[disabled]{opacity:.4}
+.sel-pop{position:absolute;z-index:6;background:var(--ink);color:#fff;font-size:14px;padding:10px 16px;border-radius:var(--r-m);box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.sel-pop[disabled]{opacity:.5}
+
+/* ---------- 评论弹层 ---------- */
+.sheet{position:absolute;inset:0;z-index:40;display:flex;flex-direction:column;justify-content:flex-end}
+.sheet .mask{position:absolute;inset:0;background:rgba(32,38,35,.4)}
+.sheet .panel{position:relative;background:var(--paper);border-radius:var(--r-m) var(--r-m) 0 0;max-height:72%;display:flex;flex-direction:column;animation:up .22s ease}
+@keyframes up{from{transform:translateY(40%)}to{transform:none}}
+.sheet .ph{padding:16px 20px 10px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;gap:10px}
+.sheet .ph h3{font-size:16px}
+.sheet .ph .demo{font-size:11px;color:var(--sub);border:1px solid var(--line);border-radius:10px;padding:2px 8px}
+.sheet .pc{font-size:12px;color:var(--sub);padding:8px 20px 0}
+.sheet ul{list-style:none;overflow-y:auto;padding:8px 20px 20px}
+.cm{padding:14px 0;border-bottom:1px solid var(--line)}
+.cm .a{font-size:13px;font-weight:600}
+.cm .t{font-size:15px;line-height:1.8;margin-top:4px}
+.cm .ag{margin-top:8px;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sub)}
+.cm .ag button{color:var(--sub);font-size:12px;display:flex;gap:4px;align-items:center}
+.cm .ag button.on{color:var(--pine)}
+.empty{padding:40px 0;text-align:center;color:var(--sub);font-size:14px}
+
+/* ---------- 发布（PG-05/06/07） ---------- */
+.choose{padding:var(--s3) var(--s2)}
+.choose h2{font-family:var(--song);font-size:20px;margin-bottom:6px}
+.choose .tip{font-size:13px;color:var(--sub);margin-bottom:16px;line-height:1.7}
+.editor{display:flex;flex-direction:column;height:100%}
+.editor .ex{margin:14px 16px 0;background:var(--card);border:1px solid var(--line);border-radius:var(--r-m);padding:14px 16px;max-height:34%;overflow-y:auto}
+.editor .ex p{font-family:var(--song);font-size:16px;line-height:1.9;white-space:pre-wrap}
+.editor .ex .m{font-size:12px;color:var(--sub);margin-top:8px}
+.editor .lb{margin:16px 16px 8px;font-size:14px;font-weight:600;display:flex;justify-content:space-between}
+.editor .lb small{color:var(--sub);font-weight:400}
+.editor textarea{margin:0 16px;height:96px;border:1px solid var(--line);border-radius:var(--r-m);background:var(--card);padding:12px 14px;font-size:15px;line-height:1.7;font-family:var(--hei);resize:none;color:var(--ink)}
+.editor textarea:focus{outline:2px solid var(--pale)}
+.editor .over{color:#A5482E}
+.editor .go{margin:auto 16px 16px}
+.preview{display:flex;flex-direction:column;height:100%}
+.pv{margin:14px 16px 0;background:var(--card);border:1px solid var(--line);border-radius:var(--r-m);padding:var(--s3) var(--s2) var(--s2);overflow:hidden}
+.pv .kicker{font-size:12px;letter-spacing:.14em;color:var(--pine);font-weight:600}
+.pv .text{font-family:var(--song);font-size:20px;line-height:2;margin-top:12px;white-space:pre-wrap}
+.pv .src{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-size:12px;color:var(--sub)}
+.pv-warn{margin:12px 16px 0;padding:12px 14px;border-radius:var(--r-m);background:#F6E8E2;color:#A5482E;font-size:13px;line-height:1.7}
+.pv-note{margin:10px 16px 0;font-size:13px;color:var(--sub);line-height:1.7}
+.pv .go{margin:auto 16px 16px;display:flex;flex-direction:column;gap:10px}
+
+/* ---------- 分享卡（PG-07） ---------- */
+.share{display:flex;flex-direction:column;height:100%}
+.share .canvas-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:16px;overflow:hidden}
+.share canvas{max-width:100%;max-height:100%;border-radius:var(--r-m);box-shadow:0 8px 30px rgba(0,0,0,.15);background:#fff}
+.share .row{display:flex;gap:12px;padding:0 16px calc(16px + env(safe-area-inset-bottom,0px))}
+.share .row .btn-p,.share .row .btn-g{flex:1}
+
+/* ---------- 我的（PG-08/09） ---------- */
+.mine .sec{padding:18px 20px 6px;font-size:13px;color:var(--sub)}
+.mine .row-list{display:flex;flex-direction:column}
+.mine .row{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line);font-size:16px;text-align:left;width:100%}
+.mine .row .ct{margin-left:auto;color:var(--sub);font-size:13px}
+.mine .row .arr{color:var(--line);font-size:16px}
+.mine .row.danger{color:#A5482E}
+.mine .who{display:flex;align-items:center;gap:14px;padding:24px 20px;border-bottom:1px solid var(--line)}
+.mine .who .av{width:52px;height:52px;border-radius:50%;background:var(--pale);display:flex;align-items:center;justify-content:center;font-family:var(--song);font-size:24px;color:var(--pine)}
+.mine .who .n{font-size:17px;font-weight:600}
+.mine .who .d{font-size:12px;color:var(--sub);margin-top:2px}
+.lt{display:flex;flex-direction:column;gap:12px;padding:14px 16px var(--s3)}
+.lt .it{background:var(--card);border:1px solid var(--line);border-radius:var(--r-m);padding:14px 16px;text-align:left}
+.lt .it .p{font-family:var(--song);font-size:15px;line-height:1.9;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.lt .it .m{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:12px;color:var(--sub);flex-wrap:wrap}
+.lt .it .m .act{margin-left:auto;display:flex;gap:12px}
+.lt .it .m button{font-size:12px;color:var(--sub)}
+.lt .it .m button.del{color:#A5482E}
+.lt .it .th{font-size:14px;color:var(--ink);margin-top:6px}
+.lt .it .th::before{content:"感想：";color:var(--sub)}
+
+/* ---------- 浮层 ---------- */
+#toast{position:fixed;left:50%;bottom:calc(110px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;font-size:13px;padding:10px 20px;border-radius:var(--r-l);opacity:0;pointer-events:none;transition:.25s;z-index:99;max-width:80vw;text-align:center}
+#toast.show{opacity:1;transform:translateX(-50%)}
+body.vp-frame #toast{position:absolute}
+.confirm .panel{padding:24px 20px 16px}
+.confirm h3{font-size:17px;text-align:center}
+.confirm p{font-size:14px;color:var(--sub);margin-top:10px;line-height:1.8;text-align:center}
+.confirm .row{display:flex;gap:12px;margin-top:20px}
+.confirm .row button{flex:1;padding:13px;border-radius:var(--r-m);font-size:15px}
+.confirm .c{background:var(--pine);color:#fff}
+.confirm .b{border:1px solid var(--line);background:var(--card);color:var(--ink)}
+.confirm .c.danger{background:#A5482E}

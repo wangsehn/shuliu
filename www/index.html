@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F8F7F2">
+<title>书流 · 首版原型</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon-192.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="书流">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div id="phone"><div id="app"></div></div>
+<div id="sheet-root"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="content/content.js?v=17"></script>
+<script src="store.js?v=17"></script>
+<script src="app.js?v=28"></script>
+<script>
+/* PWA：仅在 http(s) 且非 Capacitor 环境注册 SW（APK 内由原生外壳负责缓存，且避免 SW 缓存旧资源） */
+var IS_NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !IS_NATIVE && !/Capacitor/i.test(navigator.userAgent)) {
+  addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  });
+}
+</script>
+</body>
+</html>

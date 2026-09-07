@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>书流 · 单元测试</title>
+<style>
+  body{font:14px/1.6 Consolas,Menlo,monospace;background:#F8F7F2;color:#303A35;margin:24px}
+  h1{font-size:18px} .pass{color:#2E7D32}.fail{color:#A5482E}
+  table{border-collapse:collapse;width:100%;background:#fff}
+  td,th{border:1px solid #E4EBE3;padding:6px 10px;text-align:left}
+  .info{color:#5a6b63}
+</style>
+</head>
+<body>
+<h1>书流 单元测试（纯函数 + 内容完整性）</h1>
+<p class="info">运行环境：浏览器直接打开（需 ?test=1 以暴露测试钩子）</p>
+<div id="app" hidden></div><div id="sheet-root"></div><div id="toast" hidden></div>
+<div id="out"></div>
+<script src="../content/content.js?v=17"></script>
+<script src="../store.js?v=17"></script>
+<script src="../app.js?v=28"></script>
+<script>
+(function () {
+'use strict';
+var T = window.__SHULIU_TEST__;
+var C = window.CONTENT;
+var cases = [];
+function test(name, fn) { cases.push({ name: name, fn: fn }); }
+function assert(cond, msg) { if (!cond) throw new Error(msg || 'assert failed'); }
+function eq(a, b, msg) {
+  var sa = JSON.stringify(a), sb = JSON.stringify(b);
+  if (sa !== sb) throw new Error((msg || 'eq failed') + ' | got=' + sa + ' want=' + sb);
+}
+
+/* ---- code point 工具（PRD 8.1 口径） ---- */
+test('cpLen 按 Unicode code point 计数（含增补平面）', function () {
+  eq(T.cpLen('a𠮷b😀'), 4);
+});
+test('sliceCP 按码位切分，不切散代理对', function () {
+  eq(T.sliceCP('a𠮷b😀', 1, 3), '𠮷b');
+  eq(T.sliceCP('𠮷', 0, 1), '𠮷');
+  eq(T.sliceCP('红楼梦', 0, 2), '红楼');
+});
+test('esc 转义 & < > " \'', function () {
+  eq(T.esc('a<&>"\'b'), 'a&lt;&amp;&gt;&quot;&#39;b');
+});
+
+/* ---- mixPool 3匹配+1其他（PRD 5.4） ---- */
+function canonical(mLen, oLen) {
+  var exp = [], mi = 0, oi = 0;
+  while (mi < mLen || oi < oLen) {
+    var take = 0;
+    while (take < 3 && mi < mLen) { exp.push('M'); mi++; take++; }
+    if (oi < oLen) { exp.push('O'); oi++; }
+    if (take === 0 && oi >= oLen) break;
+  }
+  return exp.join('');
+}
+test('mixPool 双池 6M/2O', function () {
+  var out = T.mixPool(['m1','m2','m3','m4','m5','m6'], ['o1','o2']).map(function (x) { return x.charAt(0) === 'm' ? 'M' : 'O'; }).join('');
+  eq(out, canonical(6, 2));
+});
+test('mixPool 单池 O（无兴趣）', function () {
+  eq(T.mixPool([], ['o1','o2','o3']).join(','), 'o1,o2,o3');
+});
+test('mixPool 单池 M', function () {
+  eq(T.mixPool(['m1','m2','m3','m4'], []).length, 4);
+});
+test('mixPool 边界 1M/10O 与 3M/1O', function () {
+  eq(T.mixPool(['m1'], ['o1','o2','o3','o4','o5','o6','o7','o8','o9','o10']).length, 11);
+  eq(T.mixPool(['m1','m2','m3'], ['o1']).map(function (x) { return x.charAt(0); }).join(''), 'mmmo');
+});
+test('shuffle 是排列（同元素同长度）', function () {
+  var a = ['a','b','c','d','e','f'];
+  var s = T.shuffle(a);
+  eq(s.length, a.length);
+  eq(s.slice().sort().join(''), a.join(''));
+  eq(a.join(''), 'abcdef'); /* 不改入参 */
+});
+
+/* ---- buildFullOrder：前缀/可见性/与 mixPool 一致 ---- */
+test('buildFullOrder：p: 前缀、排除 hidden、结构与规范一致', function () {
+  var hidden = [C.passages[0].passageId];
+  T.setRawState({ interests: ['自我认识'], hidden: hidden });
+  var order = T.buildFullOrder();
+  var vis = T.visiblePassages();
+  eq(order.length, vis.length, '长度=可见片段数');
+  order.forEach(function (id) { assert(id.indexOf('p:') === 0, '缺少 p: 前缀: ' + id); });
+  assert(order.indexOf('p:' + hidden[0]) < 0, 'hidden 片段不应出现');
+  var mCount = vis.filter(function (p) { return p.topics.indexOf('自我认识') >= 0; }).length;
+  var kinds = order.map(function (id) {
+    var pid = id.slice(2);
+    var p = C.passages.filter(function (x) { return x.passageId === pid; })[0];
+    return p.topics.indexOf('自我认识') >= 0 ? 'M' : 'O';
+  }).join('');
+  eq(kinds, canonical(mCount, vis.length - mCount));
+});
+
+/* ---- 章节与坐标完整性（AC-09 支撑） ---- */
+test('chTitle：正常章节与缺章降级', function () {
+  var cid = C.passages[0].chapterId;
+  assert(/^第.+回/.test(T.chTitle(cid)), 'chTitle 应返回 第N回');
+  eq(T.chTitle('no-such-chapter'), '（章节信息缺失）');
+});
+test('全部 20 条片段坐标可重建原文快照（verifyLoc）', function () {
+  var bad = [];
+  C.passages.forEach(function (p) {
+    var ch = C.chapters[p.chapterId];
+    if (!ch || !T.verifyLoc(ch, p)) bad.push(p.passageId);
+  });
+  eq(bad.length, 0, '坐标失准片段: ' + bad.join(','));
+});
+
+/* ---- store.js 持久化（AC-08/23 支撑） ---- */
+test('STORE set/get 往返', function () {
+  assert(window.SHULIU_STORE.set('utest', { a: 1, b: 'x' }), 'set 应成功');
+  eq(window.SHULIU_STORE.get('utest', null), { a: 1, b: 'x' });
+});
+test('STORE 读取损坏 JSON 返回默认值，不崩溃', function () {
+  localStorage.setItem('shuliu.v1.ucorrupt', '{bad json@@');
+  eq(window.SHULIU_STORE.get('ucorrupt', 'fallback'), 'fallback');
+});
+
+/* ---- 执行与输出 ---- */
+var out = document.getElementById('out');
+var rows = [], failed = [];
+cases.forEach(function (c) {
+  var ok = true, err = null;
+  try { c.fn(); } catch (e) { ok = false; err = e.message; }
+  if (!ok) failed.push({ name: c.name, err: err });
+  rows.push('<tr><td class="' + (ok ? 'pass' : 'fail') + '">' + (ok ? 'PASS' : 'FAIL') + '</td><td>' + c.name + (err ? '<br><span class="fail">' + err.replace(/</g, '&lt;') + '</span>' : '') + '</td></tr>');
+});
+out.innerHTML = '<table><tr><th>结果</th><th>用例</th></tr>' + rows.join('') + '</table>' +
+  '<p>' + cases.length + ' 项，通过 ' + (cases.length - failed.length) + '，失败 ' + failed.length + '</p>';
+window.UNIT_RESULT = { total: cases.length, passed: cases.length - failed.length, failed: failed };
+})();
+</script>
+</body>
+</html>

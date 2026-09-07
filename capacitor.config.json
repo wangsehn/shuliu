@@ -1,0 +1,11 @@
+{
+  "appId": "com.shuliu.reader",
+  "appName": "书流",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

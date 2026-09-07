@@ -1,0 +1,29 @@
+[
+  {
+    "bookId": "hlm",
+    "title": "红楼梦",
+    "author": "曹雪芹",
+    "dynasty": "清",
+    "version": "通行整理电子本（原始数据未标注具体底本版本）",
+    "source": "luoxuhai/chinese-novel（GitHub，MIT License）",
+    "chapters": [
+      {"chapterId": "hlm-03", "number": 3, "title": "贾雨村夤缘复旧职　林黛玉抛父进京都"},
+      {"chapterId": "hlm-23", "number": 23, "title": "西厢记妙词通戏语　牡丹亭艳曲警芳心"},
+      {"chapterId": "hlm-27", "number": 27, "title": "滴翠亭杨妃戏彩蝶　埋香冢飞燕泣残红"},
+      {"chapterId": "hlm-32", "number": 32, "title": "诉肺腑心迷活宝玉　含耻辱情烈死金钏"}
+    ]
+  },
+  {
+    "bookId": "xyj",
+    "title": "西游记",
+    "author": "吴承恩",
+    "dynasty": "明",
+    "version": "通行整理电子本（原始数据未标注具体底本版本）",
+    "source": "luoxuhai/chinese-novel（GitHub，MIT License）",
+    "chapters": [
+      {"chapterId": "xyj-01", "number": 1, "title": "灵根育孕源流出　心性修持大道生"},
+      {"chapterId": "xyj-14", "number": 14, "title": "心猿归正　六贼无踪"},
+      {"chapterId": "xyj-27", "number": 27, "title": "尸魔三戏唐三藏　圣僧恨逐美猴王"}
+    ]
+  }
+]

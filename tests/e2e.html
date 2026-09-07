@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>书流 · 集成测试</title>
+<style>
+  body{font:14px/1.6 Consolas,Menlo,monospace;background:#F8F7F2;color:#303A35;margin:24px}
+  h1{font-size:18px} .pass{color:#2E7D32}.fail{color:#A5482E}
+  table{border-collapse:collapse;width:100%;background:#fff;margin-bottom:16px}
+  td,th{border:1px solid #E4EBE3;padding:6px 10px;text-align:left}
+  #frame{width:390px;height:760px;border:1px solid #ccc;margin-top:12px}
+  .info{color:#5a6b63}
+</style>
+</head>
+<body>
+<h1>书流 集成测试（首页 → 原文 → 返回 → 喜欢/收藏 → 隐藏/恢复 → 数据健壮性）</h1>
+<p class="info">iframe 内真实运行 app（390×760），驱动真实 DOM 交互与 localStorage 断言</p>
+<iframe id="frame"></iframe>
+<div id="out"></div>
+<script>
+(function () {
+'use strict';
+var f = document.getElementById('frame');
+function doc() { return f.contentDocument; }
+function win() { return f.contentWindow; }
+function tick(ms) { return new Promise(function (r) { setTimeout(r, ms || 80); }); }
+function load(url) {
+  return Promise.race([
+    new Promise(function (res) {
+      f.onload = function () { setTimeout(res, 200); };
+      f.src = url;
+    }),
+    new Promise(function (res) { setTimeout(res, 6000); }) /* 防挂：iframe 加载超时放行 */
+  ]);
+}
+async function click(sel) {
+  var el = doc().querySelector(sel);
+  if (!el) throw new Error('missing element: ' + sel);
+  el.click();
+  await tick(80);
+}
+function ls(k) { try { return JSON.parse(win().localStorage.getItem(k)); } catch (e) { return null; } }
+function lsSet(k, v) { win().localStorage.setItem(k, v); }
+function lsClear() { win().localStorage.clear(); }
+function canonical(mLen, oLen) {
+  var exp = [], mi = 0, oi = 0;
+  while (mi < mLen || oi < oLen) {
+    var take = 0;
+    while (take < 3 && mi < mLen) { exp.push('M'); mi++; take++; }
+    if (oi < oLen) { exp.push('O'); oi++; }
+    if (take === 0 && oi >= oLen) break;
+  }
+  return exp;
+}
+var base = '../index.html';
+var results = [];
+async function step(name, fn) {
+  window.E2E_CURRENT = name; /* 步骤跟踪 */
+  try { var info = await fn(); results.push({ name: name, ok: true, info: info || '' }); }
+  catch (e) { results.push({ name: name, ok: false, info: String(e && e.message || e) }); }
+  try { render(); } catch (e) { window.E2E_ERR = 'render: ' + (e && e.message || e); }
+}
+
+async function pick3() {
+  var names = ['自我认识', '亲密关系', '孤独与陪伴'];
+  names.forEach(function (t) {
+    doc().querySelector('.chip[data-t="' + t + '"]').click();
+  });
+  await click('#st-go');
+}
+
+var steps = [
+  ['AC-01/02a 跳过进入首页，兴趣为空', async function () {
+    lsClear();
+    await load(base + '?e2e=' + Date.now());
+    if (!doc().querySelector('#st-skip')) throw new Error('起始页未出现');
+    await click('#st-skip');
+    if (!doc().querySelector('#feed')) throw new Error('首页 feed 未渲染');
+    var ints = ls('shuliu.v1.interests');
+    if (!Array.isArray(ints) || ints.length !== 0) throw new Error('兴趣应存为空数组');
+    return 'interests=[]';
+  }],
+  ['AC-02b 选 3 个兴趣保存', async function () {
+    lsClear();
+    await load(base + '?e2e=' + Date.now());
+    await pick3();
+    if (!doc().querySelector('#feed')) throw new Error('保存后未进首页');
+    var ints = ls('shuliu.v1.interests');
+    if (!ints || ints.length !== 3) throw new Error('兴趣应为 3 个: ' + JSON.stringify(ints));
+    return JSON.stringify(ints);
+  }],
+  ['AC-06 混排 3匹配+1其他（与规范逐位一致）', async function () {
+    var C = win().CONTENT;
+    var order = ls('shuliu.v1.feed').order;
+    var ints = ls('shuliu.v1.interests');
+    var kinds = order.map(function (id) {
+      if (id.charAt(0) !== 'p') return 'U';
+      var p = C.passages.filter(function (x) { return x.passageId === id.slice(2); })[0];
+      return ints.some(function (i) { return p.topics.indexOf(i) >= 0; }) ? 'M' : 'O';
+    });
+    var m = kinds.filter(function (x) { return x === 'M'; }).length;
+    if (JSON.stringify(kinds) !== JSON.stringify(canonical(m, order.length - m))) {
+      throw new Error('混排不符: ' + kinds.join(''));
+    }
+    return 'M=' + m + ' O=' + (order.length - m) + ' ' + kinds.join('');
+  }],
+  ['AC-04 上滑切一条', async function () {
+    var c1 = ls('shuliu.v1.feed').cursor;
+    var feed = doc().querySelector('#feed');
+    var W = win();
+    var t1 = new W.Touch({ identifier: 1, target: feed, clientX: 100, clientY: 600 });
+    feed.dispatchEvent(new W.TouchEvent('touchstart', { touches: [t1], changedTouches: [t1], bubbles: true }));
+    var t2 = new W.Touch({ identifier: 1, target: feed, clientX: 100, clientY: 500 });
+    feed.dispatchEvent(new W.TouchEvent('touchend', { touches: [], changedTouches: [t2], bubbles: true }));
+    await tick(500); /* 等切卡动画完成后再进入下一步 */
+    var c2 = ls('shuliu.v1.feed').cursor;
+    if (c2 !== c1 + 1) throw new Error('cursor ' + c1 + '→' + c2);
+    return 'cursor ' + c1 + '→' + c2;
+  }],
+  ['AC-07 喜欢持久化（重载后保留）', async function () {
+    var pid = doc().querySelector('.card[data-pid]').dataset.pid;
+    await click('[data-act=like]');
+    var likes = ls('shuliu.v1.likes');
+    if (!likes || !likes[pid]) throw new Error('likes 未写入');
+    await load(base + '?e2e=' + Date.now());
+    var likes2 = ls('shuliu.v1.likes');
+    if (!likes2 || !likes2[pid]) throw new Error('重载后丢失');
+    return pid + ' 已持久化';
+  }],
+  ['AC-09 进入原文定位高亮', async function () {
+    var text = doc().querySelector('.card .text').textContent;
+    await click('[data-act=go-src]');
+    var m = doc().querySelector('.para mark');
+    if (!m) throw new Error('未见 <mark> 高亮');
+    if (text.indexOf(m.textContent.slice(0, 12)) !== 0) throw new Error('高亮与片段不匹配');
+    return m.textContent.slice(0, 18) + '…';
+  }],
+  ['AC-10 返回首页保持队列位置', async function () {
+    var before = ls('shuliu.v1.feed').cursor;
+    var kicker0 = doc().querySelector('#feed .kicker') ? null : 1; /* 回首页后再取 */
+    await click('[data-b]');
+    await tick(120);
+    var after = ls('shuliu.v1.feed').cursor;
+    var kicker = doc().querySelector('.card .kicker');
+    if (before !== after) throw new Error('cursor 变化 ' + before + '→' + after);
+    if (!kicker) throw new Error('首页卡片未恢复');
+    return 'cursor=' + after;
+  }],
+  ['AC-22 不感兴趣：隐藏并从尾部移除', async function () {
+    var pid = doc().querySelector('.card[data-pid]').dataset.pid;
+    await click('[data-act=more]');
+    await click('#sheet-root [data-m=hide]');
+    var h = ls('shuliu.v1.hidden');
+    var feed = ls('shuliu.v1.feed');
+    var inTail = feed.order.slice(feed.cursor).indexOf('p:' + pid) >= 0;
+    if (!h || h.indexOf(pid) < 0) throw new Error('hidden 未写入');
+    if (inTail) throw new Error('未浏览尾部仍含该条');
+    return pid + ' 已隐藏';
+  }],
+  ['AC-22 已隐藏列表恢复到首页', async function () {
+    var pid = ls('shuliu.v1.hidden')[0];
+    await click('[data-nav=mine]');
+    await click('[data-k=hidden]');
+    var btn = doc().querySelector('[data-restore]');
+    if (!btn) throw new Error('恢复按钮缺失');
+    await click('[data-restore=' + pid + ']');
+    var h = ls('shuliu.v1.hidden');
+    if (h.indexOf(pid) >= 0) throw new Error('未恢复');
+    await click('[data-b]'); /* 列表 → 我的 */
+    return pid + ' 已恢复';
+  }],
+  ['AC-02c 兴趣设置取消不保存', async function () {
+    await click('[data-x=settings]');
+    var before = Array.prototype.map.call(doc().querySelectorAll('.chip.on'), function (c) { return c.dataset.t; });
+    doc().querySelector('.chip.on').click();
+    doc().querySelector('.chip:not(.on)').click();
+    await click('[data-b]');
+    await click('[data-x=settings]');
+    var after = Array.prototype.map.call(doc().querySelectorAll('.chip.on'), function (c) { return c.dataset.t; });
+    if (JSON.stringify(before) !== JSON.stringify(after)) throw new Error(before + ' → ' + after);
+    await click('[data-b]');
+    return '保持 ' + before.join('/');
+  }],
+  ['AC-23 损坏数据可恢复（不清空全部）', async function () {
+    lsSet('shuliu.v1.likes', '{@bad json@@');
+    await load(base + '?e2e=' + Date.now());
+    var booted = doc().querySelector('#feed') || doc().querySelector('#st-skip');
+    if (!booted) throw new Error('损坏数据导致白屏');
+    return '应用正常启动';
+  }],
+  ['AC-24 清除本机记录：确认后重置', async function () {
+    await load(base + '?e2e=' + Date.now());
+    await click('[data-nav=mine]');
+    await click('[data-x=clear]');
+    await click('#sheet-root [data-c=ok]');
+    await tick(120);
+    if (!doc().querySelector('#st-skip')) throw new Error('未回到起始页');
+    var likes = ls('shuliu.v1.likes');
+    if (likes && Object.keys(likes).length) throw new Error('记录未清除');
+    return '已重置回起始页';
+  }]
+];
+
+function render() {
+  var rows = results.map(function (r) {
+    return '<tr><td class="' + (r.ok ? 'pass' : 'fail') + '">' + (r.ok ? 'PASS' : 'FAIL') + '</td><td>' +
+      r.name + (r.info ? '<br><span class="info">' + String(r.info).replace(/</g, '&lt;') + '</span>' : '') + '</td></tr>';
+  }).join('');
+  var passed = results.filter(function (r) { return r.ok; }).length;
+  document.getElementById('out').innerHTML =
+    '<table><tr><th>结果</th><th>场景</th></tr>' + rows + '</table>' +
+    '<p>' + results.length + ' 项，通过 ' + passed + '，失败 ' + (results.length - passed) + '</p>';
+}
+
+(async function run() {
+  render();
+  for (var i = 0; i < steps.length; i++) {
+    await step(steps[i][0], steps[i][1]);
+  }
+  var failed = results.filter(function (r) { return !r.ok; });
+  window.E2E_RESULT = { total: results.length, passed: results.length - failed.length, failed: failed };
+  render();
+})();
+})();
+</script>
+</body>
+</html>
