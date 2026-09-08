@@ -18,7 +18,7 @@
 
 **方式二 · Android 安装包**
 
-到 [Releases](https://github.com/wangsehn/shuliu/releases) 下载 `书流-v1.0-release.apk` → 手机上点开安装（提示未知来源时允许即可）→ 数据全部保存在本机。
+到 [Releases](https://github.com/wangsehn/shuliu/releases) 下载 `shuliu-v1.0-release.apk` → 手机上点开安装（提示未知来源时允许即可）→ 数据全部保存在本机。
 
 **方式三 · 本地运行**
 
