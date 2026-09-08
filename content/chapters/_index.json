@@ -54,5 +54,157 @@
   "title": "第二十七回　尸魔三戏唐三藏　圣僧恨逐美猴王",
   "paragraphs": 28,
   "chars": 7079
+ },
+ {
+  "chapterId": "jstl-01",
+  "bookId": "jstl",
+  "number": 1,
+  "title": "第一卷 俞伯牙摔琴谢知音",
+  "paragraphs": 24,
+  "chars": 7061
+ },
+ {
+  "chapterId": "jstl-28",
+  "bookId": "jstl",
+  "number": 28,
+  "title": "第二十八卷　白娘子永镇雷峰塔",
+  "paragraphs": 83,
+  "chars": 18304
+ },
+ {
+  "chapterId": "jstl-32",
+  "bookId": "jstl",
+  "number": 32,
+  "title": "第三十二卷　杜十娘怒沉百宝箱",
+  "paragraphs": 48,
+  "chars": 10077
+ },
+ {
+  "chapterId": "ysmy-01",
+  "bookId": "ysmy",
+  "number": 1,
+  "title": "第一卷　蒋兴哥重会珍珠衫",
+  "paragraphs": 51,
+  "chars": 20901
+ },
+ {
+  "chapterId": "ysmy-16",
+  "bookId": "ysmy",
+  "number": 16,
+  "title": "第十六卷　范巨卿鸡黍死生交",
+  "paragraphs": 16,
+  "chars": 4144
+ },
+ {
+  "chapterId": "xsh-03",
+  "bookId": "xsh",
+  "number": 3,
+  "title": "第三卷　卖油郎独占花魁",
+  "paragraphs": 69,
+  "chars": 24699
+ },
+ {
+  "chapterId": "xsh-11",
+  "bookId": "xsh",
+  "number": 11,
+  "title": "第十一卷　苏小妹三难新郎",
+  "paragraphs": 107,
+  "chars": 6893
+ },
+ {
+  "chapterId": "xsh-18",
+  "bookId": "xsh",
+  "number": 18,
+  "title": "第十八卷　施润泽滩阙遇友",
+  "paragraphs": 66,
+  "chars": 13743
+ },
+ {
+  "chapterId": "liao-15",
+  "bookId": "liao",
+  "number": 15,
+  "title": "卷一 劳山道士",
+  "paragraphs": 1,
+  "chars": 1061
+ },
+ {
+  "chapterId": "liao-48",
+  "bookId": "liao",
+  "number": 48,
+  "title": "卷二 婴宁",
+  "paragraphs": 9,
+  "chars": 4017
+ },
+ {
+  "chapterId": "liao-49",
+  "bookId": "liao",
+  "number": 49,
+  "title": "卷二 聂小倩",
+  "paragraphs": 5,
+  "chars": 2939
+ },
+ {
+  "chapterId": "sg-21",
+  "bookId": "sgyy",
+  "number": 21,
+  "title": "第二十一回　曹操煮酒论英雄　关公赚城斩车胄",
+  "paragraphs": 9,
+  "chars": 4733
+ },
+ {
+  "chapterId": "sg-37",
+  "bookId": "sgyy",
+  "number": 37,
+  "title": "第三十七回　司马徽再荐名士　刘玄德三顾草庐",
+  "paragraphs": 10,
+  "chars": 4739
+ },
+ {
+  "chapterId": "sh-02",
+  "bookId": "shzh",
+  "number": 2,
+  "title": "第二回　史大郎夜走华阴县　鲁提辖拳打镇关西",
+  "paragraphs": 166,
+  "chars": 7368
+ },
+ {
+  "chapterId": "sh-10",
+  "bookId": "shzh",
+  "number": 10,
+  "title": "第九回　林教头风雪山神庙　陆虞候火烧草料场",
+  "paragraphs": 16,
+  "chars": 6184
+ },
+ {
+  "chapterId": "rl-01",
+  "bookId": "rlws",
+  "number": 1,
+  "title": "第一回　说楔子敷陈大义　借名流隐括全文",
+  "paragraphs": 21,
+  "chars": 7004
+ },
+ {
+  "chapterId": "rl-03",
+  "bookId": "rlws",
+  "number": 3,
+  "title": "第三回　周学道校士拔真才　胡屠户行凶闹捷报",
+  "paragraphs": 26,
+  "chars": 7867
+ },
+ {
+  "chapterId": "jhy-11",
+  "bookId": "jhy",
+  "number": 11,
+  "title": "第十一回 观雅化闲游君子邦 慕仁风误入良臣府",
+  "paragraphs": 12,
+  "chars": 2882
+ },
+ {
+  "chapterId": "jhy-25",
+  "bookId": "jhy",
+  "number": 25,
+  "title": "第二十五回 越危垣潜出淑士关 登曲岸闲游两面国",
+  "paragraphs": 11,
+  "chars": 3333
  }
 ]

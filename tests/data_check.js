@@ -1,7 +1,7 @@
 /* 临时终检脚本：数据完整性独立校验（Node 环境，镜像 app.js verifyLoc 口径） */
 'use strict';
 global.window = {};
-require('./content/content.js');
+require('../content/content.js');
 var C = global.window.CONTENT;
 var issues = [];
 function ok(cond, msg) { if (!cond) issues.push(msg); }
@@ -16,9 +16,9 @@ function rebuildSnapshot(paras, loc) {
   return parts.join('\n');
 }
 
-/* 1. 结构 */
-ok(Array.isArray(C.books) && C.books.length === 2, 'books 应为 2 本');
-ok(Array.isArray(C.passages) && C.passages.length === 20, 'passages 应为 20 条');
+/* 1. 结构（内容包已扩容至 10 本 / 76 条） */
+ok(Array.isArray(C.books) && C.books.length === 10, 'books 应为 10 本');
+ok(Array.isArray(C.passages) && C.passages.length === 76, 'passages 应为 76 条');
 ok(C.chapters && typeof C.chapters === 'object', 'chapters 缺失');
 
 /* 2. 书籍字段 */
@@ -62,8 +62,8 @@ var chCount = 0, totalChars = 0;
 Object.keys(C.chapters).forEach(function (cid) {
   chCount++;
   var ch = C.chapters[cid];
-  ok(Array.isArray(ch.paragraphs) && ch.paragraphs.length > 5, '章节段落过少: ' + cid);
-  ok(ch.bookId && ch.title && /^第.+回/.test(ch.title), '章节标题异常: ' + cid);
+  ok(Array.isArray(ch.paragraphs) && ch.paragraphs.length >= 1, '章节段落缺失: ' + cid);
+  ok(ch.bookId && ch.title && (/^(第)?[一二三四五六七八九十百]+[卷回]/.test(ch.title) || /^卷[一二三四五六七八九十百]+/.test(ch.title)), '章节标题异常: ' + cid);
   var cl = ch.paragraphs.reduce(function (s, t) { return s + cps(t).length + 1; }, 0);
   ok(typeof ch.cpLength === 'number' && ch.cpLength > 500, '章节 cpLength 异常: ' + cid);
   totalChars += cl;

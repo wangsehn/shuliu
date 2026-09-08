@@ -16,9 +16,10 @@
 <p class="info">运行环境：浏览器直接打开（需 ?test=1 以暴露测试钩子）</p>
 <div id="app" hidden></div><div id="sheet-root"></div><div id="toast" hidden></div>
 <div id="out"></div>
-<script src="../content/content.js?v=17"></script>
+<script src="../content/content.js?v=18"></script>
 <script src="../store.js?v=17"></script>
-<script src="../app.js?v=28"></script>
+<script src="../recommendation.js?v=3"></script>
+<script src="../app.js?v=31"></script>
 <script>
 (function () {
 'use strict';
@@ -78,22 +79,63 @@ test('shuffle 是排列（同元素同长度）', function () {
   eq(a.join(''), 'abcdef'); /* 不改入参 */
 });
 
-/* ---- buildFullOrder：前缀/可见性/与 mixPool 一致 ---- */
-test('buildFullOrder：p: 前缀、排除 hidden、结构与规范一致', function () {
+/* ---- buildFullOrder：v2 组装硬约束（推荐系统方案验收口径） ---- */
+test('buildFullOrder：p: 前缀、排除 hidden、组装硬约束全过', function () {
   var hidden = [C.passages[0].passageId];
-  T.setRawState({ interests: ['自我认识'], hidden: hidden });
+  T.setRawState({ interests: ['自我认识'], hidden: hidden, likes: {}, saves: {}, history: {},
+    topicWeights: {}, topicLastTouched: {}, skipDebt: {}, recEvents: [] });
   var order = T.buildFullOrder();
   var vis = T.visiblePassages();
   eq(order.length, vis.length, '长度=可见片段数');
   order.forEach(function (id) { assert(id.indexOf('p:') === 0, '缺少 p: 前缀: ' + id); });
   assert(order.indexOf('p:' + hidden[0]) < 0, 'hidden 片段不应出现');
-  var mCount = vis.filter(function (p) { return p.topics.indexOf('自我认识') >= 0; }).length;
-  var kinds = order.map(function (id) {
-    var pid = id.slice(2);
-    var p = C.passages.filter(function (x) { return x.passageId === pid; })[0];
-    return p.topics.indexOf('自我认识') >= 0 ? 'M' : 'O';
-  }).join('');
-  eq(kinds, canonical(mCount, vis.length - mCount));
+  var ps = order.map(function (id) {
+    return C.passages.filter(function (x) { return x.passageId === id.slice(2); })[0];
+  });
+  var isMatch = function (p) { return p.topics.indexOf('自我认识') >= 0; };
+  var hit4 = ps.slice(0, 4).filter(isMatch).length;
+  assert(hit4 >= 3, '冷启动首 4 条命中 ' + hit4 + ' < 3');
+  for (var i = 1; i < ps.length; i++) {
+    assert(ps[i].bookId !== ps[i - 1].bookId, '位置 ' + i + ' 连续同书');
+  }
+  for (var j = 4; j < ps.length; j++) {
+    var c = 0;
+    for (var k = j - 4; k <= j; k++) if (ps[k].bookId === ps[j].bookId) c++;
+    assert(c <= 2, '5 窗同书 ' + c + ' @' + j);
+  }
+  for (var w = 3; w < ps.length; w++) {
+    var allHigh = true;
+    for (var k2 = w - 3; k2 <= w; k2++) if (!isMatch(ps[k2])) allHigh = false;
+    assert(!allHigh, '4 窗全高亲和（探索位缺失）@' + w);
+  }
+});
+
+/* ---- 推荐引擎 v2（浏览器侧冒烟） ---- */
+test('推荐引擎已加载，版本与应用一致', function () {
+  assert(window.SHULIU_RECOMMENDER, 'SHULIU_RECOMMENDER 缺失（加载顺序错误）');
+  eq(T.RECO_VERSION, window.SHULIU_RECOMMENDER.RECO_VERSION);
+});
+function recoUser() {
+  return { interests: ['自我认识'], interestsAt: 0, topicWeights: {}, topicLastTouched: {},
+    skipDebt: {}, liked: [], saved: [], hidden: [], seen: [], events: [] };
+}
+test('buildFeed：卡片带推荐理由且不连续同书', function () {
+  var R = window.SHULIU_RECOMMENDER;
+  var feed = R.buildFeed(C.passages, recoUser(), { seed: 7, now: Date.now(), limit: 20 });
+  feed.forEach(function (p, i) {
+    assert(typeof p.recommendationReason === 'string' && p.recommendationReason, '缺推荐理由 @' + i);
+    if (i) assert(p.bookId !== feed[i - 1].bookId, '连续同书 @' + i);
+  });
+});
+test('applyFeedback：like 提升主题权重并落完整埋点', function () {
+  var R = window.SHULIU_RECOMMENDER;
+  var p = C.passages.filter(function (x) { return x.topics.indexOf('亲密关系') >= 0; })[0];
+  var next = R.applyFeedback(recoUser(), { type: 'like', passage: p, at: 1700000000000, position: 1, sessionId: 1 });
+  assert(Math.abs(next.topicWeights['亲密关系'] - 1.0) < 1e-9, '权重应为 1.0，got ' + next.topicWeights['亲密关系']);
+  eq(next.events.length, 1);
+  var ev = next.events[0];
+  assert(ev.type === 'like' && ev.passageId === p.passageId && ev.position === 1 &&
+    ev.at === 1700000000000 && ev.sessionId === 1 && ev.recVersion === R.RECO_VERSION, '埋点字段不完整');
 });
 
 /* ---- 章节与坐标完整性（AC-09 支撑） ---- */

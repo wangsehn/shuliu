@@ -36,16 +36,17 @@ var sliceCP = function (s, a, b) { return cps(s).slice(a, b).join(''); };
 
 /* ============ 本机状态 ============ */
 var DEFAULTS = {
-  onboarded: false, interests: [],
+  onboarded: false, interests: [], interestsAt: 0,
   likes: {}, saves: {}, commentLikes: {},
   publishes: [], history: {}, hidden: [],
-  feed: null, topicWeights: {}, recEvents: []
+  feed: null, topicWeights: {}, topicLastTouched: {}, skipDebt: {}, recEvents: []
 };
 var S = {};
 function loadState() {
   S = {
     onboarded: STORE.get('onboarded', DEFAULTS.onboarded),
     interests: STORE.get('interests', DEFAULTS.interests),
+    interestsAt: STORE.get('interestsAt', DEFAULTS.interestsAt),
     likes: STORE.get('likes', DEFAULTS.likes),
     saves: STORE.get('saves', DEFAULTS.saves),
     commentLikes: STORE.get('commentLikes', DEFAULTS.commentLikes),
@@ -54,8 +55,14 @@ function loadState() {
     hidden: STORE.get('hidden', DEFAULTS.hidden),
     feed: STORE.get('feed', DEFAULTS.feed),
     topicWeights: STORE.get('topicWeights', DEFAULTS.topicWeights),
+    topicLastTouched: STORE.get('topicLastTouched', DEFAULTS.topicLastTouched),
+    skipDebt: STORE.get('skipDebt', DEFAULTS.skipDebt),
     recEvents: STORE.get('recEvents', DEFAULTS.recEvents)
   };
+  /* 损坏事件容忍：单条跳过（PRD 测试决策），不让坏数据阻塞启动 */
+  if (RECOMMENDER && RECOMMENDER.sanitizeEvents) {
+    S.recEvents = RECOMMENDER.sanitizeEvents(S.recEvents);
+  }
 }
 function persist(key) {
   if (!STORE.set(key, S[key])) {
@@ -67,11 +74,27 @@ function persist(key) {
 }
 function recordRecommendationFeedback(type, passage) {
   if (!RECOMMENDER || !passage) return;
-  var user = { interests: S.interests, topicWeights: S.topicWeights, liked: Object.keys(S.likes), saved: Object.keys(S.saves), hidden: S.hidden, seen: Object.keys(S.history), events: S.recEvents };
-  var next = RECOMMENDER.applyFeedback(user, { type: type, passage: passage });
+  var user = {
+    interests: S.interests, interestsAt: S.interestsAt,
+    topicWeights: S.topicWeights, topicLastTouched: S.topicLastTouched, skipDebt: S.skipDebt,
+    liked: Object.keys(S.likes), saved: Object.keys(S.saves), hidden: S.hidden,
+    seen: Object.keys(S.history), events: S.recEvents
+  };
+  /* 埋点元数据：position=当前卡片位次、at=时间戳、sessionId=本轮轮次 ID（方案要求） */
+  var next = RECOMMENDER.applyFeedback(user, {
+    type: type,
+    passage: passage,
+    at: Date.now(),
+    position: S.feed ? S.feed.cursor : -1,
+    sessionId: S.feed ? S.feed.roundId : 0
+  });
   S.topicWeights = next.topicWeights;
+  S.topicLastTouched = next.topicLastTouched;
+  S.skipDebt = next.skipDebt;
   S.recEvents = next.events;
   persist('topicWeights');
+  persist('topicLastTouched');
+  persist('skipDebt');
   persist('recEvents');
 }
 loadState();
@@ -354,6 +377,8 @@ function mountFeed(scope, item) {
   var dots = $('#dots', scope.closest ? scope.closest('.page') || document : document);
   if (!item) { renderEndroundView(feed); return; }
   feed.innerHTML = cardHTML(item);
+  /* 埋点：卡片曝光起点，供上滑时计算停留时长（≥4s 记完读，<4s 记快速划走） */
+  S._cardShownAt = Date.now();
   // 双击点赞：仅设置，不取消（PRD 5.4）
   if (item.kind === 'passage') {
     $('.card', feed).addEventListener('dblclick', function () {
@@ -403,6 +428,13 @@ function actBtn(act, label, on) {
 }
 function bindCard() {} /* 已由 bindFeedOnce 委托替代 */
 function feedNext(feed) {
+  /* 上滑离开当前卡片：按停留时长记完读或快速划走（PRD §2 事件表；≥4s 记完读 +0.3，
+     <4s 记 quick_skip——引擎内连续 2 次同主题才计 −0.5，避免误伤） */
+  var cur = currentFeedItem();
+  if (cur && cur.kind === 'passage' && RECOMMENDER) {
+    var dwell = Date.now() - (S._cardShownAt || Date.now());
+    recordRecommendationFeedback(dwell >= 4000 ? 'view_complete' : 'quick_skip', cur.p);
+  }
   if (S.feed.cursor >= S.feed.order.length - 1) {
     // 轮末
     renderEndround(); return;
@@ -1258,7 +1290,10 @@ if (location.search.indexOf('test=1') >= 0) {
     visiblePassages: visiblePassages,
     chTitle: chTitle, rebuildSnapshot: rebuildSnapshot, verifyLoc: verifyLoc,
     setRawState: function (patch) { for (var k in patch) S[k] = patch[k]; },
-    getRawState: function () { return S; }
+    getRawState: function () { return S; },
+    setCardShownAt: function (v) { S._cardShownAt = v; }, /* 埋点：模拟卡片停留起点 */
+    recordRecommendationFeedback: recordRecommendationFeedback,
+    RECO_VERSION: RECOMMENDER ? RECOMMENDER.RECO_VERSION : null
   };
 }
 

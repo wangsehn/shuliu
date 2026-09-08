@@ -25,5 +25,104 @@
       {"chapterId": "xyj-14", "number": 14, "title": "心猿归正　六贼无踪"},
       {"chapterId": "xyj-27", "number": 27, "title": "尸魔三戏唐三藏　圣僧恨逐美猴王"}
     ]
+  },
+  {
+    "bookId": "jstl",
+    "title": "警世通言",
+    "author": "冯梦龙",
+    "dynasty": "明",
+    "version": "通行整理电子本（原始数据未标注具体底本版本）",
+    "source": "luoxuhai/chinese-novel（GitHub，MIT License）",
+    "chapters": [
+      {"chapterId": "jstl-01", "number": 1, "title": "俞伯牙摔琴谢知音"},
+      {"chapterId": "jstl-28", "number": 28, "title": "白娘子永镇雷峰塔"},
+      {"chapterId": "jstl-32", "number": 32, "title": "杜十娘怒沉百宝箱"}
+    ]
+  },
+  {
+    "bookId": "ysmy",
+    "title": "喻世明言",
+    "author": "冯梦龙",
+    "dynasty": "明",
+    "version": "通行整理电子本（原始数据未标注具体底本版本）",
+    "source": "luoxuhai/chinese-novel（GitHub，MIT License）",
+    "chapters": [
+      {"chapterId": "ysmy-01", "number": 1, "title": "蒋兴哥重会珍珠衫"},
+      {"chapterId": "ysmy-16", "number": 16, "title": "范巨卿鸡黍死生交"}
+    ]
+  },
+  {
+    "bookId": "xsh",
+    "title": "醒世恒言",
+    "author": "冯梦龙",
+    "dynasty": "明",
+    "version": "通行整理电子本（原始数据未标注具体底本版本）",
+    "source": "luoxuhai/chinese-novel（GitHub，MIT License）",
+    "chapters": [
+      {"chapterId": "xsh-03", "number": 3, "title": "卖油郎独占花魁"},
+      {"chapterId": "xsh-11", "number": 11, "title": "苏小妹三难新郎"},
+      {"chapterId": "xsh-18", "number": 18, "title": "施润泽滩阙遇友"}
+    ]
+  },
+  {
+    "bookId": "liao",
+    "title": "聊斋志异",
+    "author": "蒲松龄",
+    "dynasty": "清",
+    "version": "通行整理电子本（原始数据未标注具体底本版本）",
+    "source": "luoxuhai/chinese-novel（GitHub，MIT License）",
+    "chapters": [
+      {"chapterId": "liao-15", "number": 15, "title": "劳山道士"},
+      {"chapterId": "liao-48", "number": 48, "title": "婴宁"},
+      {"chapterId": "liao-49", "number": 49, "title": "聂小倩"}
+    ]
+  },
+  {
+    "bookId": "sgyy",
+    "title": "三国演义",
+    "author": "罗贯中",
+    "dynasty": "元末明初",
+    "version": "通行整理电子本（原始数据未标注具体底本版本）",
+    "source": "luoxuhai/chinese-novel（GitHub，MIT License）",
+    "chapters": [
+      {"chapterId": "sg-21", "number": 21, "title": "曹操煮酒论英雄　关公赚城斩车胄"},
+      {"chapterId": "sg-37", "number": 37, "title": "司马徽再荐名士　刘玄德三顾草庐"}
+    ]
+  },
+  {
+    "bookId": "shzh",
+    "title": "水浒传",
+    "author": "施耐庵",
+    "dynasty": "元末明初",
+    "version": "通行整理电子本（原始数据未标注具体底本版本）",
+    "source": "luoxuhai/chinese-novel（GitHub，MIT License）",
+    "chapters": [
+      {"chapterId": "sh-02", "number": 2, "title": "史大郎夜走华阴县　鲁提辖拳打镇关西"},
+      {"chapterId": "sh-10", "number": 10, "title": "林教头风雪山神庙　陆虞候火烧草料场"}
+    ]
+  },
+  {
+    "bookId": "rlws",
+    "title": "儒林外史",
+    "author": "吴敬梓",
+    "dynasty": "清",
+    "version": "通行整理电子本（原始数据未标注具体底本版本）",
+    "source": "luoxuhai/chinese-novel（GitHub，MIT License）",
+    "chapters": [
+      {"chapterId": "rl-01", "number": 1, "title": "说楔子敷陈大义　借名流隐括全文"},
+      {"chapterId": "rl-03", "number": 3, "title": "周学道校士拔真才　胡屠户行凶闹捷报"}
+    ]
+  },
+  {
+    "bookId": "jhy",
+    "title": "镜花缘",
+    "author": "李汝珍",
+    "dynasty": "清",
+    "version": "通行整理电子本（原始数据未标注具体底本版本）",
+    "source": "luoxuhai/chinese-novel（GitHub，MIT License）",
+    "chapters": [
+      {"chapterId": "jhy-11", "number": 11, "title": "观雅化闲游君子邦 慕仁风误入良臣府"},
+      {"chapterId": "jhy-25", "number": 25, "title": "越危垣潜出淑士关 登曲岸闲游两面国"}
+    ]
   }
 ]

@@ -42,16 +42,6 @@ async function click(sel) {
 function ls(k) { try { return JSON.parse(win().localStorage.getItem(k)); } catch (e) { return null; } }
 function lsSet(k, v) { win().localStorage.setItem(k, v); }
 function lsClear() { win().localStorage.clear(); }
-function canonical(mLen, oLen) {
-  var exp = [], mi = 0, oi = 0;
-  while (mi < mLen || oi < oLen) {
-    var take = 0;
-    while (take < 3 && mi < mLen) { exp.push('M'); mi++; take++; }
-    if (oi < oLen) { exp.push('O'); oi++; }
-    if (take === 0 && oi >= oLen) break;
-  }
-  return exp;
-}
 var base = '../index.html';
 var results = [];
 async function step(name, fn) {
@@ -89,20 +79,30 @@ var steps = [
     if (!ints || ints.length !== 3) throw new Error('兴趣应为 3 个: ' + JSON.stringify(ints));
     return JSON.stringify(ints);
   }],
-  ['AC-06 混排 3匹配+1其他（与规范逐位一致）', async function () {
+  ['AC-06v2 组装硬约束：首4≥3命中/不连续同书/5窗≤2/探索位', async function () {
     var C = win().CONTENT;
     var order = ls('shuliu.v1.feed').order;
     var ints = ls('shuliu.v1.interests');
-    var kinds = order.map(function (id) {
-      if (id.charAt(0) !== 'p') return 'U';
-      var p = C.passages.filter(function (x) { return x.passageId === id.slice(2); })[0];
-      return ints.some(function (i) { return p.topics.indexOf(i) >= 0; }) ? 'M' : 'O';
+    var ps = order.filter(function (id) { return id.charAt(0) === 'p'; }).map(function (id) {
+      return C.passages.filter(function (x) { return x.passageId === id.slice(2); })[0];
     });
-    var m = kinds.filter(function (x) { return x === 'M'; }).length;
-    if (JSON.stringify(kinds) !== JSON.stringify(canonical(m, order.length - m))) {
-      throw new Error('混排不符: ' + kinds.join(''));
+    var isMatch = function (p) { return p.topics.some(function (t) { return ints.indexOf(t) >= 0; }); };
+    var hit4 = ps.slice(0, 4).filter(isMatch).length;
+    if (hit4 < 3) throw new Error('冷启动首4命中 ' + hit4 + ' < 3');
+    for (var i = 1; i < ps.length; i++) {
+      if (ps[i].bookId === ps[i - 1].bookId) throw new Error('连续同书 @' + i);
     }
-    return 'M=' + m + ' O=' + (order.length - m) + ' ' + kinds.join('');
+    for (var j = 4; j < ps.length; j++) {
+      var c = 0;
+      for (var k = j - 4; k <= j; k++) if (ps[k].bookId === ps[j].bookId) c++;
+      if (c >= 3) throw new Error('5窗同书≥3 @' + j);
+    }
+    for (var w = 3; w < ps.length; w++) {
+      var allHigh = true;
+      for (var k2 = w - 3; k2 <= w; k2++) if (!isMatch(ps[k2])) allHigh = false;
+      if (allHigh) throw new Error('4窗全高亲和（探索位缺失）@' + w);
+    }
+    return '首4命中=' + hit4 + ' 共' + ps.length + '条 全约束通过';
   }],
   ['AC-04 上滑切一条', async function () {
     var c1 = ls('shuliu.v1.feed').cursor;
@@ -117,6 +117,15 @@ var steps = [
     if (c2 !== c1 + 1) throw new Error('cursor ' + c1 + '→' + c2);
     return 'cursor ' + c1 + '→' + c2;
   }],
+  ['REC-01 上滑落埋点：quick_skip 含 position/at/sessionId/recVersion', async function () {
+    var evs = ls('shuliu.v1.recEvents') || [];
+    if (!evs.length) throw new Error('recEvents 为空');
+    var last = evs[evs.length - 1];
+    if (last.type !== 'quick_skip') throw new Error('期望 quick_skip，got ' + last.type);
+    if (typeof last.position !== 'number' || last.position < 0) throw new Error('position 缺失');
+    if (!last.at || !last.sessionId || !last.recVersion || !last.id) throw new Error('埋点元数据缺失');
+    return 'pos=' + last.position + ' v=' + last.recVersion;
+  }],
   ['AC-07 喜欢持久化（重载后保留）', async function () {
     var pid = doc().querySelector('.card[data-pid]').dataset.pid;
     await click('[data-act=like]');
@@ -126,6 +135,15 @@ var steps = [
     var likes2 = ls('shuliu.v1.likes');
     if (!likes2 || !likes2[pid]) throw new Error('重载后丢失');
     return pid + ' 已持久化';
+  }],
+  ['REC-02 喜欢写入主题画像权重', async function () {
+    var likedPid = Object.keys(ls('shuliu.v1.likes'))[0];
+    var p = win().CONTENT.passages.filter(function (x) { return x.passageId === likedPid; })[0];
+    var tw = ls('shuliu.v1.topicWeights') || {};
+    if (!((tw[p.topics[0]] || 0) >= 1)) throw new Error('主题权重未 +1: ' + JSON.stringify(tw));
+    var evs = ls('shuliu.v1.recEvents') || [];
+    if (!evs.some(function (e) { return e.type === 'like' && e.passageId === likedPid; })) throw new Error('like 埋点缺失');
+    return p.topics[0] + '=' + tw[p.topics[0]];
   }],
   ['AC-09 进入原文定位高亮', async function () {
     var text = doc().querySelector('.card .text').textContent;

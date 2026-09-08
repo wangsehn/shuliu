@@ -55,6 +55,7 @@ function log(msg) { console.log(msg); }
   } finally {
     await browser.close();
   }
+  fs.mkdirSync(path.join(ROOT, '验收截图'), { recursive: true });
   fs.writeFileSync(path.join(ROOT, '验收截图', 'sw_offline_result.json'), JSON.stringify(REPORT, null, 1));
   log('RESULT_WRITTEN');
 })().catch(e => { log('FATAL ' + (e && e.message)); process.exit(1); });

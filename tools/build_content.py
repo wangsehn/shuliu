@@ -17,10 +17,18 @@ APP = Path(__file__).resolve().parents[1]            # test/first_app/
 CONTENT = APP / "content"
 CH_DIR = CONTENT / "chapters"
 
-# 选定承载章节：书 -> [(文件下标, chapterId, 回目序号)]
+# 选定承载章节：书 -> [(文件下标, chapterId, 回目序号)]（文件下标 0 起）
 PLAN = {
     "hlm": {"dir": BOOKS / "世态人情" / "红楼梦", "ids": [(2, "hlm-03", 3), (22, "hlm-23", 23), (26, "hlm-27", 27), (31, "hlm-32", 32)]},
     "xyj": {"dir": BOOKS / "鬼怪神魔" / "西游记", "ids": [(0, "xyj-01", 1), (13, "xyj-14", 14), (26, "xyj-27", 27)]},
+    "jstl": {"dir": BOOKS / "世态人情" / "警世通言", "ids": [(0, "jstl-01", 1), (27, "jstl-28", 28), (31, "jstl-32", 32)]},
+    "ysmy": {"dir": BOOKS / "世态人情" / "喻世明言", "ids": [(0, "ysmy-01", 1), (15, "ysmy-16", 16)]},
+    "xsh": {"dir": BOOKS / "世态人情" / "醒世恒言", "ids": [(2, "xsh-03", 3), (10, "xsh-11", 11), (17, "xsh-18", 18)]},
+    "liao": {"dir": BOOKS / "鬼怪神魔" / "聊斋志异", "ids": [(14, "liao-15", 15), (47, "liao-48", 48), (48, "liao-49", 49)]},
+    "sgyy": {"dir": BOOKS / "历史演义" / "三国演义", "ids": [(20, "sg-21", 21), (36, "sg-37", 37)]},
+    "shzh": {"dir": BOOKS / "英雄传奇" / "水浒传", "ids": [(2, "sh-02", 2), (9, "sh-10", 10)]},
+    "rlws": {"dir": BOOKS / "谴责公案" / "儒林外史", "ids": [(1, "rl-01", 1), (3, "rl-03", 3)]},
+    "jhy": {"dir": BOOKS / "鬼怪神魔" / "镜花缘", "ids": [(10, "jhy-11", 11), (24, "jhy-25", 25)]},
 }
 
 def clean_html(p: Path):
