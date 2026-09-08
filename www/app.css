@@ -47,27 +47,38 @@ button{font-family:var(--hei);border:0;background:none;color:inherit;cursor:poin
 
 /* ---------- 首页书流（PG-02） ---------- */
 .home{display:flex;flex-direction:column;height:100%}
-.resume{flex:0 0 auto;margin:10px 16px 0;padding:12px 16px;border-radius:var(--r-m);background:var(--pale);display:flex;align-items:center;gap:10px;width:auto;text-align:left}
-.resume .l1{font-size:14px;font-weight:600;color:var(--ink)}
-.resume .l2{font-size:12px;color:var(--sub);margin-top:2px}
-.resume .arr{margin-left:auto;color:var(--pine);font-size:18px}
+.resume-toast{position:absolute;left:16px;right:16px;top:12px;z-index:30;padding:12px 14px;border-radius:var(--r-m);background:var(--pale);border:1px solid var(--line);box-shadow:0 6px 18px rgba(48,58,53,.12);display:flex;align-items:center;gap:10px;width:auto;text-align:left;animation:resume-in .32s ease}
+.resume-toast.hide{animation:resume-out .3s ease forwards}
+.resume-toast .l1{font-size:14px;font-weight:600;color:var(--ink)}
+.resume-toast .l2{font-size:12px;color:var(--sub);margin-top:2px}
+.resume-toast .x{margin-left:auto;flex:0 0 auto;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--sub);background:rgba(255,255,255,.7)}
+@keyframes resume-in{from{transform:translateY(-16px);opacity:0}to{transform:none;opacity:1}}
+@keyframes resume-out{to{transform:translateY(-12px);opacity:0}}
 .feed{flex:1;position:relative;overflow:hidden}
-.cardwrap{position:absolute;inset:0;display:flex;flex-direction:column;padding:14px 16px 0;transition:transform .28s ease,opacity .28s ease}
+.cardwrap{position:absolute;inset:0;display:flex;flex-direction:column;padding:12px 18px 0;transition:transform .28s ease,opacity .28s ease}
 .cardwrap.out-up{transform:translateY(-36%);opacity:0}
 .cardwrap.in-down{transform:translateY(36%);opacity:0}
-.card{flex:1;display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:var(--r-m);padding:var(--s3) var(--s2) var(--s2);overflow:hidden}
-.card .kicker{font-size:12px;letter-spacing:.14em;color:var(--pine);font-weight:600}
-.card .body{flex:1;display:flex;align-items:center;overflow:hidden}
-.card .text{font-family:var(--song);font-size:20px;line-height:2;color:var(--ink);white-space:pre-wrap}
-.card .src{padding-top:var(--s2);border-top:1px solid var(--line);display:flex;align-items:baseline;gap:8px}
-.card .src .bt{font-size:14px;font-weight:600}
-.card .src .ct{font-size:12px;color:var(--sub)}
-.card .src .go{margin-left:auto;font-size:13px;color:var(--pine);font-weight:600}
-.actions{flex:0 0 auto;display:flex;justify-content:space-around;align-items:center;padding:10px 6px 12px}
-.actions button{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:var(--sub);padding:4px 10px}
-.actions svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8}
+/* 沉浸式阅读纸张：去卡片容器，文字内容本身就是界面 */
+.card{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.card .kicker{flex:0 0 auto;font-size:12px;letter-spacing:.02em;font-weight:600;color:var(--ink);opacity:.78}
+.card .kicker::before{content:"✦ ";color:var(--pine);opacity:.9}
+.card .reason{flex:0 0 auto;font-size:11px;color:var(--sub);margin-top:5px}
+.card .body{flex:1;display:flex;align-items:center;overflow:hidden;min-height:0}
+.card .text{font-family:var(--song);font-size:18px;line-height:1.72;color:var(--ink);white-space:pre-wrap;text-wrap:pretty}
+.card .src{flex:0 0 auto;display:flex;flex-direction:column;gap:5px;padding:10px 0 2px;border-top:1px solid var(--line)}
+.card .src-t{font-size:15px;font-weight:700;color:var(--ink)}
+.card .src-t .src-a{font-size:12.5px;font-weight:400;color:var(--sub)}
+.card .src .ct{font-size:12px;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card .src-row{display:flex;align-items:center;gap:10px}
+.card .src-row .ct{flex:1;min-width:0}
+.card .src .go{flex:0 0 auto;display:inline-flex;align-items:center;font-size:12.5px;font-weight:600;color:var(--pine);border:1px solid var(--pine);border-radius:999px;padding:6px 13px;background:transparent}
+.actions{position:absolute;right:0;top:50%;transform:translateY(-50%);z-index:6;display:flex;flex-direction:column;gap:8px;align-items:center;padding:8px 2px}
+.actions button{display:flex;flex-direction:column;align-items:center;gap:1px;padding:3px 8px;color:#7C837F}
+.actions button .n{font-size:10px;font-weight:600;color:#969D99;font-variant-numeric:tabular-nums}
+.actions svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8}
 .actions button.on{color:var(--pine)}
 .actions button.on svg{fill:var(--pine)}
+.actions button.on .n{color:var(--pine)}
 .deck-dots{flex:0 0 auto;display:flex;justify-content:center;gap:6px;padding:0 0 8px}
 .deck-dots i{width:6px;height:6px;border-radius:50%;background:var(--line)}
 .deck-dots i.on{background:var(--pine)}

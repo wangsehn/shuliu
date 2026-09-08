@@ -121,14 +121,26 @@ function mixPool(match, other) {
   }
   return out;
 }
+var _lastReasonMap = {}; /* buildFullOrder/rebuildTail 产出的「片段ID→推荐理由」映射，供 ensureFeed 写入 S.feed */
 function buildFullOrder() {
   var vis = visiblePassages();
-  var user = { interests: S.interests, topicWeights: S.topicWeights, liked: Object.keys(S.likes), saved: Object.keys(S.saves), hidden: S.hidden, seen: Object.keys(S.history) };
-  return RECOMMENDER.buildFeed(vis, user, { limit: vis.length }).map(function (p) { return 'p:' + p.passageId; });
+  var user = { interests: S.interests, interestsAt: S.interestsAt, topicWeights: S.topicWeights, topicLastTouched: S.topicLastTouched, liked: Object.keys(S.likes), saved: Object.keys(S.saves), hidden: S.hidden, seen: Object.keys(S.history) };
+  var items = RECOMMENDER.buildFeed(vis, user, { limit: vis.length });
+  _lastReasonMap = {};
+  items.forEach(function (p) { _lastReasonMap[p.passageId] = p.recommendationReason || ''; });
+  return items.map(function (p) { return 'p:' + p.passageId; });
 }
 function ensureFeed() {
   if (!S.feed || !S.feed.order || !S.feed.order.length) {
-    S.feed = { roundId: Date.now(), order: buildFullOrder(), cursor: 0 };
+    S.feed = { roundId: Date.now(), order: buildFullOrder(), cursor: 0, reasonMap: _lastReasonMap };
+    persist('feed');
+  } else if (!S.feed.reasonMap) {
+    /* 兼容 v37 前已持久化的存量 feed：按当前画像补算理由，不打乱既有顺序与进度 */
+    var buser = { interests: S.interests, interestsAt: S.interestsAt, topicWeights: S.topicWeights, topicLastTouched: S.topicLastTouched, liked: Object.keys(S.likes), saved: Object.keys(S.saves), hidden: S.hidden, seen: Object.keys(S.history) };
+    S.feed.reasonMap = {};
+    S.feed.order.forEach(function (id) {
+      if (id.charAt(0) === 'p' && PASSAGE[id.slice(2)]) S.feed.reasonMap[id.slice(2)] = RECOMMENDER.reasonFor(PASSAGE[id.slice(2)], buser, Date.now());
+    });
     persist('feed');
   }
 }
@@ -142,11 +154,18 @@ function rebuildTail(opts) {
   viewed.forEach(function (id) { viewedSet[id] = 1; });
   var keep = S.feed.order.slice(keepN).filter(function (id) { return id.charAt(0) === 'u'; });
   var vis = visiblePassages().filter(function (p) { return !viewedSet['p:' + p.passageId]; });
-  var user = { interests: S.interests, topicWeights: S.topicWeights, liked: Object.keys(S.likes), saved: Object.keys(S.saves), hidden: S.hidden, seen: viewed.map(function (id) { return id.slice(2); }) };
-  var tail = RECOMMENDER.buildFeed(vis, user, { limit: vis.length }).map(function (p) { return 'p:' + p.passageId; });
+  var user = { interests: S.interests, interestsAt: S.interestsAt, topicWeights: S.topicWeights, topicLastTouched: S.topicLastTouched, liked: Object.keys(S.likes), saved: Object.keys(S.saves), hidden: S.hidden, seen: viewed.map(function (id) { return id.slice(2); }) };
+  var items = RECOMMENDER.buildFeed(vis, user, { limit: vis.length });
+  var reasonMap = {};
+  viewed.forEach(function (id) {
+    if (id.charAt(0) === 'p' && S.feed.reasonMap && S.feed.reasonMap[id.slice(2)]) reasonMap[id.slice(2)] = S.feed.reasonMap[id.slice(2)];
+  });
+  items.forEach(function (p) { reasonMap[p.passageId] = p.recommendationReason || ''; });
+  var tail = items.map(function (p) { return 'p:' + p.passageId; });
   tail = keep.concat(tail);
   if (opts && opts.insertFirst) { tail = opts.insertFirst.concat(tail); }
   S.feed.order = viewed.concat(tail);
+  S.feed.reasonMap = reasonMap;
   persist('feed');
 }
 function feedItemOf(id) {
@@ -298,9 +317,17 @@ function rebuildHomeAndGo() {
 }
 
 /* ============ PG-02 首页书流 ============ */
+var RESUME_TOAST_MS = 10000; /* 「继续阅读」浮层停留时长（进入首页弹出，约 10s 后自动消失） */
 function currentFeedItem() {
   ensureFeed();
   return feedItemOf(S.feed.order[S.feed.cursor]);
+}
+function dismissResume() {
+  clearTimeout(S._resumeTimer);
+  var t = $('#resume');
+  if (!t || t.classList.contains('hide')) return;
+  t.classList.add('hide');
+  setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 320);
 }
 function renderHome() {
   var el = document.createElement('div');
@@ -308,16 +335,26 @@ function renderHome() {
   var resume = latestHistory();
   var item = currentFeedItem();
   el.innerHTML =
-    (resume ? '<button class="resume" id="resume"><span><span class="l1">继续阅读：' + BOOK[resume.bookId].title + ' · 第' + numCN(resume.number) + '回</span>' +
-      '<span class="l2">上次读到 ' + resume.title + '</span></span><span class="arr">→</span></button>' : '') +
     '<div class="feed" id="feed"></div>' +
     '<div class="deck-dots" id="dots"></div>' +
     navHTML('home');
   app.innerHTML = '';
   app.appendChild(el);
-  if (resume) $('#resume').addEventListener('click', function () {
-    go('reader', { chapterId: resume.chapterId, resume: true, resumePara: resume.paraIdx, resumeOff: resume.off || 0 });
-  });
+  if (resume) {
+    /* 继续阅读：浮动提示条，进入首页时滑入，停留 RESUME_TOAST_MS 后自动淡出；点 × 可提前关闭 */
+    var rt = document.createElement('button');
+    rt.className = 'resume-toast'; rt.id = 'resume';
+    rt.innerHTML = '<span><span class="l1">继续阅读：' + BOOK[resume.bookId].title + ' · 第' + numCN(resume.number) + '回</span>' +
+      '<span class="l2">上次读到 ' + resume.title + '</span></span><span class="x" aria-label="关闭">×</span>';
+    el.appendChild(rt);
+    rt.addEventListener('click', function (e) {
+      var viaX = e.target.closest('.x');
+      dismissResume();
+      if (viaX) return;
+      go('reader', { chapterId: resume.chapterId, resume: true, resumePara: resume.paraIdx, resumeOff: resume.off || 0 });
+    });
+    S._resumeTimer = setTimeout(dismissResume, RESUME_TOAST_MS);
+  }
   var pending = S.store_pending;
   if (pending) {
     S.store_pending = null;
@@ -385,24 +422,33 @@ function mountFeed(scope, item) {
       var pid = item.p.passageId;
       if (!S.likes[pid]) {
         S.likes[pid] = Date.now();
-        if (persist('likes')) { toast('已喜欢'); var b = $('[data-act="like"]', feed); if (b) b.classList.add('on'); }
+        if (persist('likes')) {
+          recordRecommendationFeedback('like', PASSAGE[pid]); /* 与点 ❤ 按钮同一事件入口，口径统一 */
+          toast('已喜欢'); var b = $('[data-act="like"]', feed); if (b) b.classList.add('on');
+        }
       } else { toast('已经在喜欢的列表里了'); }
     });
   }
   var label = item.kind === 'publish' ? '本机发布' : '第 ' + (S.feed.cursor + 1) + ' 条';
   dots.innerHTML = '<span style="font-size:11px;color:var(--sub)">' + label + ' · 上滑换下一段</span>';
 }
+function commentCount(pid) {
+  return (C.demo_comments || []).filter(function (c) { return c.passageId === pid; }).length;
+}
 function cardHTML(item) {
-  var p, intro, srcBook, srcCh, goLabel;
+  var p, srcBook, srcCh;
+  /* 底部书籍信息：垂直两层——《书名》(主) + 章节(截断) + 查看原文 CTA（UI 重构：书名 > 章节 > 原文入口） */
   if (item.kind === 'publish') {
     var pub = item.pub;
     srcBook = BOOK[pub.bookId]; srcCh = pub.chapterTitle;
     return '<div class="cardwrap"><div class="card" data-kind="publish">' +
       '<div class="kicker">我发布的片段</div>' +
       '<div class="body"><div class="text">' + esc(pub.text) + '</div></div>' +
-      (pub.thought ? '<div class="src"><span class="ct">感想：' + esc(pub.thought) + '</span></div>' : '') +
-      '<div class="src"><span class="bt">' + srcBook.title + '</span><span class="ct">' + esc(srcCh) + '</span>' +
-      '<button class="go" data-act="go-src">进入原文</button></div></div>' +
+      '<div class="src">' +
+      (pub.thought ? '<div class="ct">感想：' + esc(pub.thought) + '</div>' : '') +
+      '<div class="src-t">《' + srcBook.title + '》<span class="src-a"> · ' + srcBook.author + '</span></div>' +
+      '<div class="src-row"><span class="ct">' + esc(srcCh) + '</span>' +
+      '<button class="go" data-act="go-src">查看原文 →</button></div></div>' +
       '<div class="actions">' +
       actBtn('go-src2', '原文') + actBtn('share', '分享') + actBtn('mine', '管理') +
       '</div></div>';
@@ -410,21 +456,27 @@ function cardHTML(item) {
   p = item.p;
   srcBook = BOOK[p.bookId];
   srcCh = chTitle(p.chapterId);
+  var reason = (S.feed && S.feed.reasonMap && S.feed.reasonMap[p.passageId]) || '';
   return '<div class="cardwrap"><div class="card" data-pid="' + p.passageId + '">' +
     '<div class="kicker">' + esc(p.intro) + '</div>' +
+    (reason ? '<div class="reason">' + esc(reason) + '</div>' : '') +
     '<div class="body"><div class="text">' + esc(p.text) + '</div></div>' +
-    '<div class="src"><span class="bt">' + srcBook.title + '</span><span class="ct">' + srcBook.author + ' · ' + esc(srcCh) + '</span>' +
-    '<button class="go" data-act="go-src">进入原文</button></div></div>' +
+    '<div class="src">' +
+    '<div class="src-t">《' + srcBook.title + '》<span class="src-a"> · ' + srcBook.author + '</span></div>' +
+    '<div class="src-row"><span class="ct">' + esc(srcCh) + '</span>' +
+    '<button class="go" data-act="go-src">查看原文 →</button></div></div>' +
     '<div class="actions">' +
-    actBtn('like', '喜欢', !!S.likes[p.passageId]) +
-    actBtn('save', '收藏', !!S.saves[p.passageId]) +
-    actBtn('comment', '评论') +
+    actBtn('like', '喜欢', !!S.likes[p.passageId], S.likes[p.passageId] ? 1 : 0) +
+    actBtn('save', '收藏', !!S.saves[p.passageId], S.saves[p.passageId] ? 1 : 0) +
+    actBtn('comment', '评论', false, commentCount(p.passageId)) +
     actBtn('more', '更多') +
     '</div></div>';
 }
-function actBtn(act, label, on) {
+/* 右侧操作栏：默认只显示图标 + 计数（无文字标签），信息流口径 */
+function actBtn(act, label, on, count) {
   var map = { 'go-src2': 'book', like: 'heart', save: 'bookmark', mine: 'user' };
-  return '<button data-act="' + act + '"' + (on ? ' class="on"' : '') + '>' + ICON[map[act] || act] + '<span>' + label + '</span></button>';
+  return '<button data-act="' + act + '"' + (on ? ' class="on"' : '') + ' aria-label="' + label + '">' + ICON[map[act] || act] +
+    (count ? '<span class="n">' + count + '</span>' : '') + '</button>';
 }
 function bindCard() {} /* 已由 bindFeedOnce 委托替代 */
 function feedNext(feed) {
@@ -485,7 +537,7 @@ function toggleLike(pid, btn) {
   var was = !!S.likes[pid];
   if (was) delete S.likes[pid]; else S.likes[pid] = Date.now();
   if (persist('likes')) {
-    if (!was) recordRecommendationFeedback('like', PASSAGE[pid]);
+    recordRecommendationFeedback(was ? 'unlike' : 'like', PASSAGE[pid]);
     btn.classList.toggle('on', !was);
     toast(was ? '已取消喜欢' : '已喜欢');
   } else { loadState(); }
@@ -494,7 +546,7 @@ function toggleSave(pid, btn) {
   var was = !!S.saves[pid];
   if (was) delete S.saves[pid]; else S.saves[pid] = Date.now();
   if (persist('saves')) {
-    if (!was) recordRecommendationFeedback('save', PASSAGE[pid]);
+    recordRecommendationFeedback(was ? 'unsave' : 'save', PASSAGE[pid]);
     btn.classList.toggle('on', !was);
     toast(was ? '已取消收藏' : '已收藏');
   } else { loadState(); }

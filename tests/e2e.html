@@ -216,6 +216,58 @@ var steps = [
     var likes = ls('shuliu.v1.likes');
     if (likes && Object.keys(likes).length) throw new Error('记录未清除');
     return '已重置回起始页';
+  }],
+  ['REC-03 推荐理由上屏', async function () {
+    await load(base + '?e2e=' + Date.now());
+    await click('#st-skip');
+    await tick(200);
+    var r = doc().querySelector('#feed .card .reason');
+    if (!r) throw new Error('理由行未渲染');
+    if (!/因为|给你|相似/.test(r.textContent)) throw new Error('理由文案不匹配引擎模板: ' + r.textContent);
+    var feed = ls('shuliu.v1.feed');
+    if (!feed.reasonMap || !Object.keys(feed.reasonMap).length) throw new Error('reasonMap 未持久化');
+    return r.textContent.slice(0, 20);
+  }],
+  ['REC-04 取消喜欢回退画像权重', async function () {
+    var pid = doc().querySelector('.card[data-pid]').dataset.pid;
+    var p = win().CONTENT.passages.filter(function (x) { return x.passageId === pid; })[0];
+    var t0 = p.topics[0];
+    var tw0 = (ls('shuliu.v1.topicWeights') || {})[t0] || 0;
+    await click('[data-act=like]'); await tick(120);
+    var tw1 = (ls('shuliu.v1.topicWeights') || {})[t0] || 0;
+    await click('[data-act=like]'); await tick(120);
+    var tw2 = (ls('shuliu.v1.topicWeights') || {})[t0] || 0;
+    if (Math.abs(tw1 - tw0 - 1) > 0.01) throw new Error('点赞未+1: ' + tw0 + '->' + tw1);
+    if (Math.abs(tw2 - tw0) > 0.01) throw new Error('unlike 未回退: ' + tw1 + '->' + tw2);
+    var evs = ls('shuliu.v1.recEvents') || [];
+    if (!evs.some(function (e) { return e.type === 'unlike' && e.passageId === pid; })) throw new Error('unlike 事件缺失');
+    return t0 + ': ' + tw0 + '->' + tw1 + '->' + tw2;
+  }],
+  ['REC-05 双击点赞产生 like 埋点', async function () {
+    var pid = doc().querySelector('.card[data-pid]').dataset.pid;
+    var cnt = function () {
+      return (ls('shuliu.v1.recEvents') || []).filter(function (e) { return e.type === 'like' && e.passageId === pid; }).length;
+    };
+    var before = cnt();
+    doc().querySelector('.card[data-pid]').dispatchEvent(new (win().MouseEvent)('dblclick', { bubbles: true }));
+    await tick(150);
+    if (cnt() !== before + 1) throw new Error('双击未产生 like 事件 (' + before + '->' + cnt() + ')');
+    return 'like 事件 +' + (cnt() - before);
+  }],
+  ['REC-06 衰减参数透传：interestsAt 与 topicLastTouched 影响排序', async function () {
+    var R = win().SHULIU_RECOMMENDER;
+    var now = Date.now(), d = 86400000;
+    var pa = win().CONTENT.passages.filter(function (p) { return p.topics.indexOf('亲密关系') >= 0; })[0];
+    var pb = win().CONTENT.passages.filter(function (p) { return p.topics.indexOf('孤独与陪伴') >= 0 && p.bookId !== pa.bookId; })[0];
+    if (!pa || !pb) throw new Error('测试池不足');
+    var mk = function (ia, lt) {
+      return { interests: ['亲密关系'], interestsAt: ia, topicWeights: { '孤独与陪伴': 1.5 }, topicLastTouched: { '孤独与陪伴': lt }, liked: [], saved: [], hidden: [], seen: [], events: [] };
+    };
+    var freshInt = R.buildFeed([pa, pb], mk(now, now - 30 * d), {});   /* 声明兴趣新鲜 → pa 第一 */
+    var freshLearn = R.buildFeed([pa, pb], mk(now - 30 * d, now), {}); /* 学到的权重新鲜 → pb 第一 */
+    if (freshInt[0].passageId !== pa.passageId) throw new Error('interestsAt 衰减未生效: ' + freshInt[0].passageId);
+    if (freshLearn[0].passageId !== pb.passageId) throw new Error('topicLastTouched 透传未生效: ' + freshLearn[0].passageId);
+    return '双参数均生效';
   }]
 ];
 
