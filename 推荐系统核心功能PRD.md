@@ -2,9 +2,24 @@
 
 版本：V1.0
 
-状态：待开发
+状态：V1 已上线（recommendation-system 分支）；V1.1 规划中
 
 目标平台：书流 Web / Android App
+
+## 实现状态对照（V1 已上线 / V1.1 规划）
+
+| 事件 | 状态 | 说明 |
+|---|---|---|
+| like / unlike | ✅ V1 已上线 | 含 ❤ 按钮与双击正文两条路径，事件口径统一；取消喜欢回退画像权重 |
+| save / unsave | ✅ V1 已上线 | 取消收藏反向修正画像（-1.2） |
+| view_complete / quick_skip | ✅ V1 已上线 | 停留时长 ≥4s 判定完读；连续 2 次同主题划走才计负分（防误伤） |
+| open_original | ✅ V1 已上线 | 「查看原文 →」入口触发 |
+| not_interested | ✅ V1 已上线 | 即时 -0.5 并隐藏该片段 |
+| impression | ⏳ V1.1 | 曝光事件（当前以内存态 S._cardShownAt 支撑完读判定，未落账） |
+| continue_reading | ⏳ V1.1 | 阅读页续读埋点（续读功能本身已上线） |
+| share | ⏳ V1.1 | 分享动作埋点（分享卡功能已上线） |
+
+> V1 上线口径：6 个核心行为事件闭环 + 推荐理由上屏 + 时间衰减全链路生效 + unlike/unsave 反向修正（批次 A 交付，v37）。
 
 ## Problem Statement
 
