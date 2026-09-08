@@ -1,5 +1,12 @@
 apply plugin: 'com.android.application'
 
+/* 签名密码从本地未跟踪文件 android/shuliu-signing.properties 读取（不入库）；
+   文件缺失时为空值，release 构建需先在本地创建该文件（storePassword=... / keyPassword=...）。 */
+def signingProps = new Properties()
+def signingPropsFile = rootProject.file('shuliu-signing.properties')
+if (signingPropsFile.exists()) {
+    signingPropsFile.withInputStream { signingProps.load(it) }
+}
 android {
     namespace "com.shuliu.reader"
     compileSdk rootProject.ext.compileSdkVersion
@@ -19,9 +26,9 @@ android {
     signingConfigs {
         release {
             storeFile file('shuliu-release.keystore')
-            storePassword 'shuliu2026'
+            storePassword signingProps.getProperty('storePassword', '')
             keyAlias 'shuliu'
-            keyPassword 'shuliu2026'
+            keyPassword signingProps.getProperty('keyPassword', '')
         }
     }
     buildTypes {
