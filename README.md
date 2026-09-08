@@ -7,6 +7,29 @@
 - 在线体验（PWA）：https://wangsehn.github.io/shuliu/
 - 全部计算在客户端完成，无服务器、无登录、无第三方上报；数据存本机 localStorage
 
+## 00 快速体验（3 种方式）
+
+**方式一 · 浏览器直接玩（无需安装）**
+
+打开 https://wangsehn.github.io/shuliu/ → 选 3 个兴趣 → 开始刷。
+
+- 电脑：鼠标滚轮 / ↑↓ 方向键 / 按住拖拽均可翻页，双击正文点赞
+- 手机：上滑翻页，浏览器菜单「添加到主屏幕」后可作为独立 App 运行（PWA，支持离线）
+
+**方式二 · Android 安装包**
+
+到 [Releases](https://github.com/wangsehn/shuliu/releases) 下载 `书流-v1.0-release.apk` → 手机上点开安装（提示未知来源时允许即可）→ 数据全部保存在本机。
+
+**方式三 · 本地运行**
+
+```bash
+git clone https://github.com/wangsehn/shuliu.git
+cd shuliu
+python -m http.server 8931   # 浏览器打开 http://localhost:8931
+```
+
+> 数据与隐私：所有行为数据（滑动、停留、喜欢、收藏）仅存在本机浏览器/设备中，用于本地兴趣画像计算，不上传任何服务器。「我的 → 清除本机记录」可一键重置冷启动。
+
 ## 01 问题
 
 经典文学阅读启动成本高：用户不知道从哪读起。大部头劝退、选书困难、读两页就放下。现有阅读产品解决「读完」，不解决「开始读」。
