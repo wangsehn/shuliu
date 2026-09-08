@@ -398,6 +398,32 @@ function bindFeedOnce(scope) {
     if (dy < -44) feedNext(feed);
     else if (dy > 44) feedPrev(feed);
   }, { passive: true });
+
+  /* 桌面端翻页：滚轮 / 鼠标拖拽 / 方向键（复用 feedNext/feedPrev，与触屏同一埋点口径） */
+  var wheelLock = 0; /* 一次滚动手势会连发多个 wheel 事件，450ms 锁防连翻 */
+  feed.addEventListener('wheel', function (e) {
+    var now = Date.now();
+    if (now < wheelLock || Math.abs(e.deltaY) < 30) return;
+    wheelLock = now + 450;
+    if (e.deltaY > 0) feedNext(feed); else feedPrev(feed);
+  }, { passive: true });
+  var my0 = null;
+  feed.addEventListener('mousedown', function (e) { my0 = e.clientY; });
+  feed.addEventListener('mouseup', function (e) {
+    if (my0 === null) return;
+    var dy = e.clientY - my0;
+    my0 = null;
+    if (String(window.getSelection())) return; /* 用户在划选文本，不翻页 */
+    if (dy < -44) feedNext(feed);
+    else if (dy > 44) feedPrev(feed);
+  });
+  var onFeedKey = function (e) {
+    if (!document.contains(feed)) { document.removeEventListener('keydown', onFeedKey); return; }
+    if ($('#sheet-root').innerHTML) return; /* 弹层打开时不翻页 */
+    if (e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); feedNext(feed); }
+    else if (e.key === 'ArrowUp' || e.key === 'PageUp') { e.preventDefault(); feedPrev(feed); }
+  };
+  document.addEventListener('keydown', onFeedKey);
 }
 function latestHistory() {
   var best = null;
@@ -430,7 +456,8 @@ function mountFeed(scope, item) {
     });
   }
   var label = item.kind === 'publish' ? '本机发布' : '第 ' + (S.feed.cursor + 1) + ' 条';
-  dots.innerHTML = '<span style="font-size:11px;color:var(--sub)">' + label + ' · 上滑换下一段</span>';
+  var hint = ('ontouchstart' in window) ? '上滑换下一段' : '滚轮 / ↑↓ 键换段';
+  dots.innerHTML = '<span style="font-size:11px;color:var(--sub)">' + label + ' · ' + hint + '</span>';
 }
 function commentCount(pid) {
   return (C.demo_comments || []).filter(function (c) { return c.passageId === pid; }).length;
