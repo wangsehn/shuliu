@@ -446,6 +446,15 @@ function latestHistory() {
   return best;
 }
 function numCN(n) { return n; }
+/* 作者显示文本：兼容遗留字符串与百本导入的 {dynasty, name, intro} 对象 */
+function authorText(b) {
+  var a = b && b.author;
+  if (a && typeof a === 'object') {
+    var d = a.dynasty && a.dynasty !== '未知' ? a.dynasty + ' · ' : '';
+    return (d + (a.name || '')) || '';
+  }
+  return a || '';
+}
 
 function mountFeed(scope, item) {
   var feed = typeof scope === 'string' ? $('#feed', scope) : scope;
@@ -485,7 +494,7 @@ function cardHTML(item) {
       '<div class="body"><div class="text">' + esc(pub.text) + '</div></div>' +
       '<div class="src">' +
       (pub.thought ? '<div class="ct">感想：' + esc(pub.thought) + '</div>' : '') +
-      '<div class="src-t">《' + srcBook.title + '》<span class="src-a"> · ' + srcBook.author + '</span></div>' +
+      '<div class="src-t">《' + srcBook.title + '》<span class="src-a"> · ' + esc(authorText(srcBook)) + '</span></div>' +
       '<div class="src-row"><span class="ct">' + esc(srcCh) + '</span>' +
       '<button class="go" data-act="go-src">查看原文 →</button></div></div>' +
       '<div class="actions">' +
@@ -501,7 +510,7 @@ function cardHTML(item) {
     (reason ? '<div class="reason">' + esc(reason) + '</div>' : '') +
     '<div class="body"><div class="text">' + esc(p.text) + '</div></div>' +
     '<div class="src">' +
-    '<div class="src-t">《' + srcBook.title + '》<span class="src-a"> · ' + srcBook.author + '</span></div>' +
+    '<div class="src-t">《' + srcBook.title + '》<span class="src-a"> · ' + esc(authorText(srcBook)) + '</span></div>' +
     '<div class="src-row"><span class="ct">' + esc(srcCh) + '</span>' +
     '<button class="go" data-act="go-src">查看原文 →</button></div></div>' +
     '<div class="actions">' +
@@ -646,7 +655,7 @@ function renderBook() {
   el.innerHTML =
     '<div class="topbar"><button class="back" data-b>←</button><div><div class="tt">' + book.title + '</div><div class="crumb">本书精选</div></div></div>' +
     '<div class="scroll">' +
-    '<div class="bk-head"><h2>本书精选片段</h2><p class="meta">' + book.author + ' · ' + ps.length + ' 条 · 均来自已收录章节</p></div>' +
+    '<div class="bk-head"><h2>本书精选片段</h2><p class="meta">' + esc(authorText(book)) + ' · ' + ps.length + ' 条 · 均来自已收录章节</p></div>' +
     '<div class="ps-list">' + ps.map(function (p) {
       return '<button class="ps-item" data-pid="' + p.passageId + '"><div class="p">' + esc(p.text) + '</div>' +
         '<div class="m">' + esc(p.intro) + '</div></button>';
@@ -1003,7 +1012,7 @@ function renderChoose() {
     '<div class="topbar"><div><div class="tt">发布</div><div class="crumb">从本书选一段，写下你的想法</div></div></div>' +
     '<div class="scroll"><div class="choose">' +
     C.books.map(function (b) {
-      return '<h2>' + b.title + ' <span style="font-size:12px;color:var(--sub)">' + b.author + '</span></h2>' +
+      return '<h2>' + b.title + ' <span style="font-size:12px;color:var(--sub)">' + esc(authorText(b)) + '</span></h2>' +
         '<p class="tip">先打开一章，划选想发布的原文。</p>' +
         '<div class="ch-list">' + b.chapters.map(function (c) {
           return '<button class="ch-item" data-cid="' + c.chapterId + '"><span class="n">第' + c.number + '回</span><span>' + esc(c.title) + '</span></button>';

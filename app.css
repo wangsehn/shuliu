@@ -49,6 +49,7 @@ button{font-family:var(--hei);border:0;background:none;color:inherit;cursor:poin
 .home{display:flex;flex-direction:column;height:100%}
 .resume-toast{position:absolute;left:16px;right:16px;top:12px;z-index:30;padding:12px 14px;border-radius:var(--r-m);background:var(--pale);border:1px solid var(--line);box-shadow:0 6px 18px rgba(48,58,53,.12);display:flex;align-items:center;gap:10px;width:auto;text-align:left;animation:resume-in .32s ease}
 .resume-toast.hide{animation:resume-out .3s ease forwards}
+.resume-toast>span:first-child{flex:1;min-width:0;display:flex;flex-direction:column}
 .resume-toast .l1{font-size:14px;font-weight:600;color:var(--ink)}
 .resume-toast .l2{font-size:12px;color:var(--sub);margin-top:2px}
 .resume-toast .x{margin-left:auto;flex:0 0 auto;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--sub);background:rgba(255,255,255,.7)}

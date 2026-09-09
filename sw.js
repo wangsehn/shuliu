@@ -1,7 +1,7 @@
 /* 书流 Service Worker
    策略：导航请求网络优先（离线回退缓存的 index.html）；
    静态资源缓存优先 + 运行时入库（自动兼容 ?v= 版本参数，改版本号即自然换新）。 */
-var CACHE = 'shuliu-runtime-v3';
+var CACHE = 'shuliu-runtime-v4';
 
 self.addEventListener('install', function (e) {
   e.waitUntil(
