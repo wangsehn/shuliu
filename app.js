@@ -122,17 +122,22 @@ function mixPool(match, other) {
   return out;
 }
 var _lastReasonMap = {}; /* buildFullOrder/rebuildTail 产出的「片段ID→推荐理由」映射，供 ensureFeed 写入 S.feed */
+var _lastRelaxedMap = {}; /* 片段ID→豁免等级（引擎逐槽放宽探索/书约束时标记），供验收与测试审计 */
 function buildFullOrder() {
   var vis = visiblePassages();
   var user = { interests: S.interests, interestsAt: S.interestsAt, topicWeights: S.topicWeights, topicLastTouched: S.topicLastTouched, liked: Object.keys(S.likes), saved: Object.keys(S.saves), hidden: S.hidden, seen: Object.keys(S.history) };
   var items = RECOMMENDER.buildFeed(vis, user, { limit: vis.length });
   _lastReasonMap = {};
-  items.forEach(function (p) { _lastReasonMap[p.passageId] = p.recommendationReason || ''; });
+  _lastRelaxedMap = {};
+  items.forEach(function (p) {
+    _lastReasonMap[p.passageId] = p.recommendationReason || '';
+    if (p.relaxed) _lastRelaxedMap[p.passageId] = p.relaxed;
+  });
   return items.map(function (p) { return 'p:' + p.passageId; });
 }
 function ensureFeed() {
   if (!S.feed || !S.feed.order || !S.feed.order.length) {
-    S.feed = { roundId: Date.now(), order: buildFullOrder(), cursor: 0, reasonMap: _lastReasonMap };
+    S.feed = { roundId: Date.now(), order: buildFullOrder(), cursor: 0, reasonMap: _lastReasonMap, relaxedMap: _lastRelaxedMap };
     persist('feed');
   } else if (!S.feed.reasonMap) {
     /* 兼容 v37 前已持久化的存量 feed：按当前画像补算理由，不打乱既有顺序与进度 */
@@ -161,11 +166,18 @@ function rebuildTail(opts) {
     if (id.charAt(0) === 'p' && S.feed.reasonMap && S.feed.reasonMap[id.slice(2)]) reasonMap[id.slice(2)] = S.feed.reasonMap[id.slice(2)];
   });
   items.forEach(function (p) { reasonMap[p.passageId] = p.recommendationReason || ''; });
+  var relaxedMap = S.feed.relaxedMap || {};
+  var newRelaxed = {};
+  viewed.forEach(function (id) {
+    if (id.charAt(0) === 'p' && relaxedMap[id.slice(2)]) newRelaxed[id.slice(2)] = relaxedMap[id.slice(2)];
+  });
+  items.forEach(function (p) { if (p.relaxed) newRelaxed[p.passageId] = p.relaxed; });
   var tail = items.map(function (p) { return 'p:' + p.passageId; });
   tail = keep.concat(tail);
   if (opts && opts.insertFirst) { tail = opts.insertFirst.concat(tail); }
   S.feed.order = viewed.concat(tail);
   S.feed.reasonMap = reasonMap;
+  S.feed.relaxedMap = newRelaxed;
   persist('feed');
 }
 function feedItemOf(id) {
@@ -663,7 +675,8 @@ function chTitle(cid) {
   if (!doc) return '（章节信息缺失）';
   var b = BOOK[doc.bookId];
   var c = b.chapters.filter(function (x) { return x.chapterId === cid; })[0];
-  return c ? '第' + c.number + '回　' + c.title : '（章节信息缺失）';
+  if (!c) return '（章节信息缺失）';
+  return c.number > 0 ? '第' + c.number + '回　' + c.title : c.title;
 }
 function rebuildSnapshot(paras, loc) {
   // 与构建脚本一致：跨段以 \n 连接；code point 偏移
@@ -683,27 +696,76 @@ function verifyLoc(chapter, p) {
   } catch (e) { return false; }
 }
 
+/* ============ 章节正文懒加载（百本库：正文按书分包 content/text/{bookId}.js） ============ */
+var _textLoading = {};
+var _APP_BASE = (function () {
+  var m = document.querySelector('script[src*="app.js"]');
+  return m ? m.src.replace(/app\.js.*$/, '') : '';
+})();
+function getChapterParas(bookId, chapterId) {
+  var T = window.SHULIU_TEXT;
+  return (T && T[bookId] && T[bookId][chapterId]) || null;
+}
+function loadBookText(bookId, cb) {
+  var T = window.SHULIU_TEXT;
+  if (T && T[bookId]) { cb(null, T[bookId]); return; }
+  if (_textLoading[bookId]) { _textLoading[bookId].push(cb); return; }
+  _textLoading[bookId] = [cb];
+  var s = document.createElement('script');
+  s.src = _APP_BASE + 'content/text/' + bookId + '.js';
+  s.onload = function () {
+    var q = _textLoading[bookId] || []; delete _textLoading[bookId];
+    var map = window.SHULIU_TEXT && window.SHULIU_TEXT[bookId];
+    q.forEach(function (f) { f(map ? null : 'empty', map); });
+  };
+  s.onerror = function () {
+    var q = _textLoading[bookId] || []; delete _textLoading[bookId];
+    q.forEach(function (f) { f('load-fail'); });
+  };
+  document.head.appendChild(s);
+}
+
 /* ============ PG-03 原文阅读 ============ */
 var readerState = null;
+function renderReaderMissing() {
+  var miss = document.createElement('div');
+  miss.className = 'page reader';
+  miss.innerHTML = '<div class="topbar"><button class="back" data-b>←</button><div><div class="tt">内容缺失</div><div class="crumb">本章暂未收录</div></div></div>' +
+    '<div class="scroll"><div class="empty">这一章的内容暂时缺失，稍后再来看看。</div></div>';
+  app.innerHTML = '';
+  app.appendChild(miss);
+  miss.querySelector('[data-b]').addEventListener('click', back);
+}
 function renderReader(data) {
-  var ch = C.chapters[data.chapterId];
-  if (!ch) { /* AC-11/23：缺章降级，不误打开、不崩溃 */
-    var miss = document.createElement('div');
-    miss.className = 'page reader';
-    miss.innerHTML = '<div class="topbar"><button class="back" data-b>←</button><div><div class="tt">内容缺失</div><div class="crumb">本章暂未收录</div></div></div>' +
-      '<div class="scroll"><div class="empty">这一章的内容暂时缺失，稍后再来看看。</div></div>';
-    app.innerHTML = '';
-    app.appendChild(miss);
-    miss.querySelector('[data-b]').addEventListener('click', back);
+  var meta = C.chapters[data.chapterId];
+  if (!meta) { /* AC-11/23：缺章降级，不误打开、不崩溃 */
+    renderReaderMissing();
     return;
   }
+  var cached = getChapterParas(meta.bookId, data.chapterId);
+  if (cached) { renderReaderBody(data, meta, cached); return; }
+  /* 正文按书分包，首次打开需加载：先占位，成功后守卫渲染（快速切换不回写旧章） */
+  var el = document.createElement('div');
+  el.className = 'page reader';
+  el.innerHTML = '<div class="topbar"><button class="back" data-b>←</button><div><div class="tt">' + esc(BOOK[meta.bookId] ? BOOK[meta.bookId].title : '') + '</div><div class="crumb">正在打开本章…</div></div></div>' +
+    '<div class="scroll"><div class="empty">正在打开本章…</div></div>';
+  app.innerHTML = '';
+  app.appendChild(el);
+  el.querySelector('[data-b]').addEventListener('click', back);
+  loadBookText(meta.bookId, function (err, map) {
+    var t = top();
+    if (t.page !== 'reader' || t.data.chapterId !== data.chapterId) return;
+    if (err || !map || !map[data.chapterId]) { renderReaderMissing(); return; }
+    renderReaderBody(data, meta, map[data.chapterId]);
+  });
+}
+function renderReaderBody(data, ch, paras) {
   var book = BOOK[ch.bookId];
-  var paras = ch.paragraphs;
   var el = document.createElement('div');
   el.className = 'page reader';
   var passage = data.passageId ? PASSAGE[data.passageId] : null;
   var locOK = false;
-  if (passage) locOK = verifyLoc(ch, passage);
+  if (passage) locOK = verifyLoc({ paragraphs: paras }, passage);
 
   // 组装段落 HTML（含高亮）
   var html = '';
@@ -801,7 +863,7 @@ function renderReader(data) {
   }, { passive: true });
 
   // 划选发布（PRD FR-07 / AC-11）
-  bindSelection(el, scroll, ch, data);
+  bindSelection(el, scroll, ch, data, paras);
 
   // Esc 返回（AC-09）
   readerState.escHandler = function (e) { if (e.key === 'Escape') back(); };
@@ -837,7 +899,7 @@ function nextChapter(ch) {
 }
 
 /* 划选 → 发布片段（from 区分两种入口：publish=导航发布，其他=正文阅读中划选） */
-function bindSelection(scope, scroll, ch, data) {
+function bindSelection(scope, scroll, ch, data, paras) {
   function cpOffsetInPara(pEl, node, no) {
     var acc = 0, found = false;
     Array.prototype.forEach.call(pEl.childNodes, function (c) {
@@ -889,7 +951,7 @@ function bindSelection(scope, scroll, ch, data) {
     so = cpOffsetInPara(p1, r.startContainer, r.startOffset);
     var eo = cpOffsetInPara(p2, r.endContainer, r.endOffset);
     if (sp === ep && so >= eo) return null;
-    var text = rebuildSnapshot(ch.paragraphs, { sp: sp, so: so, ep: ep, eo: eo });
+    var text = rebuildSnapshot(paras, { sp: sp, so: so, ep: ep, eo: eo });
     if (cpLen(text) < 2) return null;
     return { loc: { sp: sp, so: so, ep: ep, eo: eo }, text: text };
   }

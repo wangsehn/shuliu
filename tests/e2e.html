@@ -81,8 +81,10 @@ var steps = [
   }],
   ['AC-06v2 组装硬约束：首4≥3命中/不连续同书/5窗≤2/探索位', async function () {
     var C = win().CONTENT;
-    var order = ls('shuliu.v1.feed').order;
+    var feedState = ls('shuliu.v1.feed');
+    var order = feedState.order;
     var ints = ls('shuliu.v1.interests');
+    var relaxedMap = feedState.relaxedMap || {};
     var ps = order.filter(function (id) { return id.charAt(0) === 'p'; }).map(function (id) {
       return C.passages.filter(function (x) { return x.passageId === id.slice(2); })[0];
     });
@@ -97,12 +99,21 @@ var steps = [
       for (var k = j - 4; k <= j; k++) if (ps[k].bookId === ps[j].bookId) c++;
       if (c >= 3) throw new Error('5窗同书≥3 @' + j);
     }
+    var relaxedCount = 0;
     for (var w = 3; w < ps.length; w++) {
       var allHigh = true;
       for (var k2 = w - 3; k2 <= w; k2++) if (!isMatch(ps[k2])) allHigh = false;
-      if (allHigh) throw new Error('4窗全高亲和（探索位缺失）@' + w);
+      if (allHigh) {
+        /* 探索候选耗尽时引擎逐槽豁免（relaxed≥1 显式可查，PRD 契约），窗口内有豁免即合规 */
+        var explained = false;
+        for (var k3 = w - 3; k3 <= w; k3++) {
+          if ((relaxedMap[ps[k3].passageId] || 0) >= 1) { explained = true; break; }
+        }
+        if (!explained) throw new Error('4窗全高亲和（探索位缺失且无豁免标记）@' + w);
+        relaxedCount++;
+      }
     }
-    return '首4命中=' + hit4 + ' 共' + ps.length + '条 全约束通过';
+    return '首4命中=' + hit4 + ' 共' + ps.length + '条 全约束通过' + (relaxedCount ? '（豁免窗口=' + relaxedCount + '）' : '');
   }],
   ['AC-04 上滑切一条', async function () {
     var c1 = ls('shuliu.v1.feed').cursor;

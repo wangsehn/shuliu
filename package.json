@@ -18,5 +18,8 @@
     "@capacitor/app": "^6.0.3",
     "@capacitor/cli": "^6.2.2",
     "@capacitor/core": "^6.2.2"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.63.0"
   }
 }

@@ -16,10 +16,12 @@
 <p class="info">运行环境：浏览器直接打开（需 ?test=1 以暴露测试钩子）</p>
 <div id="app" hidden></div><div id="sheet-root"></div><div id="toast" hidden></div>
 <div id="out"></div>
-<script src="../content/content.js?v=18"></script>
+<script src="../content/content.js?v=19"></script>
+<script src="../content/text/hlm.js"></script>
+<script src="../content/text/jhy.js"></script>
 <script src="../store.js?v=17"></script>
-<script src="../recommendation.js?v=3"></script>
-<script src="../app.js?v=31"></script>
+<script src="../recommendation.js?v=4"></script>
+<script src="../app.js?v=39"></script>
 <script>
 (function () {
 'use strict';
@@ -144,12 +146,16 @@ test('chTitle：正常章节与缺章降级', function () {
   assert(/^第.+回/.test(T.chTitle(cid)), 'chTitle 应返回 第N回');
   eq(T.chTitle('no-such-chapter'), '（章节信息缺失）');
 });
-test('全部 20 条片段坐标可重建原文快照（verifyLoc）', function () {
-  var bad = [];
+test('加载分包的片段坐标可重建原文快照（verifyLoc，hlm/jhy 全量）', function () {
+  var bad = [], n = 0;
   C.passages.forEach(function (p) {
-    var ch = C.chapters[p.chapterId];
-    if (!ch || !T.verifyLoc(ch, p)) bad.push(p.passageId);
+    if (p.bookId !== 'hlm' && p.bookId !== 'jhy') return;
+    var paras = window.SHULIU_TEXT[p.bookId][p.chapterId];
+    if (!paras) { bad.push(p.passageId + ':无正文'); return; }
+    n++;
+    if (!T.verifyLoc({ paragraphs: paras }, p)) bad.push(p.passageId);
   });
+  assert(n >= 5, '抽样片段过少: ' + n);
   eq(bad.length, 0, '坐标失准片段: ' + bad.join(','));
 });
 

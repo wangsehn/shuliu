@@ -46,6 +46,9 @@
 
   var HALF_LIFE_MS = CONFIG.halfLifeDays * 86400000;
 
+  /* 空记录共享 shim：fastSet 对空数组免分配（indexOf 恒 -1） */
+  var EMPTY_IDX_SHIM = { indexOf: function () { return -1; } };
+
   function cloneUser(user) {
     user = user || {};
     return {
@@ -117,20 +120,28 @@
 
   /* 推荐理由：只能来自真实触发条件（PRD §6）。
      优先级：同 ID 喜欢/收藏 > 主题有正显式反馈（学到） > 声明兴趣（冷启动） > 探索文案 */
-  function reasonFor(p, user, now) {
+  /* wcache 查表（effectiveWeight 纯函数的预计算值），未命中回退现算 */
+  function effW(wcache, user, t, now) {
+    if (wcache) {
+      var v = wcache[t];
+      if (v !== undefined) return v;
+    }
+    return effectiveWeight(user, t, now);
+  }
+  function reasonFor(p, user, now, wcache) {
     now = now || Date.now();
     if (has(user.liked, p.passageId) || has(user.saved, p.passageId)) return '和你喜欢过的内容相似';
     var topics = (p && p.topics) || [];
     var i, t;
     for (i = 0; i < topics.length; i++) {
       t = topics[i];
-      if (typeof user.topicWeights[t] === 'number' && user.topicWeights[t] > 0 && effectiveWeight(user, t, now) > 0.5) {
+      if (typeof user.topicWeights[t] === 'number' && user.topicWeights[t] > 0 && effW(wcache, user, t, now) > 0.5) {
         return '因为你喜欢过「' + t + '」相关内容';
       }
     }
     for (i = 0; i < topics.length; i++) {
       t = topics[i];
-      if (has(user.interests, t) && effectiveWeight(user, t, now) > 0.5) {
+      if (has(user.interests, t) && effW(wcache, user, t, now) > 0.5) {
         return '因为你选择了「' + t + '」';
       }
     }
@@ -144,16 +155,6 @@
      - 探索卡不存在或全部与书约束冲突时，放宽探索约束、保书约束；
      - 书约束也无法满足（池子结构耗尽）时按分数兜底并计数（relaxedBookCount 供评估）。
      逐槽选择避免了「延迟项集中补到尾部」造成的长段高亲和聚集。 */
-  function violatesBookRules(out, p) {
-    var n = out.length;
-    if (n > 0 && out[n - 1].p.bookId === p.bookId) return true;      /* 不连续同书 */
-    var c = 0;
-    for (var i = Math.max(0, n - 4); i < n; i++) {
-      if (out[i].p.bookId === p.bookId) c++;
-    }
-    return c >= 2;                                                    /* 5 窗口同书 ≤2 */
-  }
-
   /* 放下 m 条同书所需的最小槽位数（每 5 窗 ≤2 且不连续的最优排列）：
      m=1→1, 2→3, 3→6, 4→8, 5→11 …（成对放置，每对占 5 槽） */
   function minSpan(m) {
@@ -162,65 +163,160 @@
   }
 
   function assemble(ranked, limit, user, now) {
+    /* 百本库性能改造（4636 条池）：语义与逐槽贪心完全一致。数据结构：
+       - 存活候选维护为双向链表（O(1) 摘除，仍按 ranked 序遍历），取代 nextAlive 死前缀重扫；
+       - 探索项单独维护一条 ranked 序存活链：needExplore 槽位直接取链首可行项，
+         免去在全量存活表中线性寻找分散于分数尾部的探索项（exp 标记由 buildFeed 预算）；
+       - 每书 FIFO 队列 + 头指针（头指针只前进，O(1) 摊还），取代 q.shift() 的 O(队列长) 搬移；
+       - 紧急书按（剩余数降序, 首现序升序）维护（每槽仅消费之书需重新就位），逐槽只走满足
+         minSpan ≥ slotsLeft−2 的连续前缀，取代每槽 for..in 全表重建 + 排序；
+       - bookId 在入口一次性映射为整数序号，queues/counts/rank/pos/bookOrder 全部按整数
+         下标存取（数组读代替每槽多次字符串哈希查找），候选对象附带 .b 书序号供约束比较。 */
     var out = [];
-    var remaining = ranked.slice(); /* 与 ranked 共享 item 引用 */
+    var n = ranked.length;
+    var alive = new Array(n);
+    var nxt = new Array(n);
+    var prv = new Array(n);
+    var expNxt = new Array(n);   /* 探索项专用存活链（ranked 序） */
+    var expPrv = new Array(n);
+    var expHead = -1;
+    var bInt = {};               /* bookId -> 整数序号（仅初始化期使用） */
+    var bCount = [];             /* 书序号 -> 剩余条数 */
+    var bRank = [];              /* 书序号 -> 首次出现序（等量书的稳定 tie-break） */
+    var bPos = [];               /* 书序号 -> 在 bookOrder 中的下标 */
+    var bQ = [];                 /* 书序号 -> [下标…]（按 ranked 顺序） */
+    var bQh = [];                /* 书序号 -> 队首指针 */
+    var bookOrder = [];          /* count>0 的书序号，按（剩余数降序, 首现序升序）维护 */
+    var k, i, b;
+    for (k = 0; k < n; k++) {
+      alive[k] = 1;
+      nxt[k] = k + 1 < n ? k + 1 : -1;
+      prv[k] = k - 1;
+      var bid = ranked[k].p.bookId;
+      b = bInt[bid];
+      if (b === undefined) { b = bCount.length; bInt[bid] = b; }
+      ranked[k].b = b;
+      (bQ[b] || (bQ[b] = [])).push(k);
+      if (!bCount[b]) { bRank[b] = bookOrder.push(b) - 1; bPos[b] = bRank[b]; }
+      bCount[b] = (bCount[b] || 0) + 1;
+    }
+    /* 探索链按 ranked 序串接（反向遍历 + 头插 → 升序） */
+    for (k = n - 1; k >= 0; k--) {
+      if (ranked[k].exp) {
+        expNxt[k] = expHead; expPrv[k] = -1;
+        if (expHead >= 0) expPrv[expHead] = k;
+        expHead = k;
+      }
+    }
+    bookOrder.sort(function (x, y) { return bCount[y] - bCount[x]; });
+    for (k = 0; k < bookOrder.length; k++) bPos[bookOrder[k]] = k;
+    var aliveHead = n > 0 ? 0 : -1;
     var relaxedBookCount = 0;
 
-    function bookOk(p) { return !violatesBookRules(out, p); }
+    function unlink(i) {
+      if (prv[i] >= 0) nxt[prv[i]] = nxt[i]; else aliveHead = nxt[i];
+      if (nxt[i] >= 0) prv[nxt[i]] = prv[i];
+      if (ranked[i].exp) {
+        if (expPrv[i] >= 0) expNxt[expPrv[i]] = expNxt[i]; else expHead = expNxt[i];
+        if (expNxt[i] >= 0) expPrv[expNxt[i]] = expPrv[i];
+      }
+      alive[i] = 0;
+    }
+
+    function bookOk(item) {
+      /* 内联书约束检查（同书不连续 + 5 窗 ≤2），整数序号比较 */
+      var m = out.length;
+      if (m > 0 && out[m - 1].b === item.b) return false;
+      var c = 0;
+      for (var j = Math.max(0, m - 4); j < m; j++) {
+        if (out[j].b === item.b) c++;
+      }
+      return c < 2;
+    }
 
     function last3AllHigh() {
-      if (out.length < 3) return false;
-      for (var i = out.length - 3; i < out.length; i++) {
-        if (isExplore(out[i].p, user, now)) return false;
-      }
+      var L = out.length;
+      if (L < 3) return false;
+      for (var j = L - 3; j < L; j++) { if (out[j].exp) return false; }
       return true;
     }
 
-    while (out.length < limit && remaining.length) {
-      var slotsLeft = Math.min(limit - out.length, remaining.length);
+    /* 该书队首（ranked 序最前的存活项）；头指针只前进，摊还 O(1) */
+    function headOf(book) {
+      var q = bQ[book], h = bQh[book] || 0;
+      while (h < q.length && !alive[q[h]]) h++;
+      bQh[book] = h;
+      return h < q.length ? q[h] : -1;
+    }
+
+    while (out.length < limit) {
+      var slotsLeft = Math.min(limit - out.length, n - out.length);
       /* 尾部容量保护（紧急度）：某书剩余条数的最小占用跨度接近/超过剩余槽位时，
          再不占位违规将不可避免（贪心延迟会把大书堆到尾部造成被动违规）。
-         紧急度 = minSpan(count) − slotsLeft，≥ −2 视为临界，按紧急度从高到低提前占位。 */
-      var counts = {};
-      remaining.forEach(function (it) { counts[it.p.bookId] = (counts[it.p.bookId] || 0) + 1; });
-      var urgent = [];
-      for (var b in counts) {
-        var u = minSpan(counts[b]) - slotsLeft;
-        if (u >= -2) urgent.push({ book: b, u: u, n: counts[b] });
-      }
-      urgent.sort(function (x, y) { return y.u - x.u || y.n - x.n; });
-
+         紧急度 = minSpan(count) − slotsLeft，≥ −2 视为临界，按紧急度从高到低提前占位。
+         bookOrder 按剩余降序，紧急条件对降序序列连续成立，走前缀即可。 */
       var needExplore = last3AllHigh();
-      var pick = -1, relaxed = 0, i;
+      var pick = -1, relaxed = 0;
 
-      for (var ui = 0; ui < urgent.length && pick < 0; ui++) {
-        for (i = 0; i < remaining.length; i++) {
-          var rp = remaining[i].p;
-          if (rp.bookId === urgent[ui].book && bookOk(rp)) {
-            pick = i;
-            if (needExplore && !isExplore(rp, user, now)) relaxed = 1;
-            break;
-          }
+      for (var oi = 0; oi < bookOrder.length; oi++) {
+        var ob = bookOrder[oi];
+        if (minSpan(bCount[ob]) < slotsLeft - 2) break;   /* 之后剩余更少，均不紧急 */
+        var hi = headOf(ob);
+        if (hi >= 0 && bookOk(ranked[hi])) {
+          pick = hi;
+          if (needExplore && !ranked[hi].exp) relaxed = 1;
+          break;
         }
       }
       if (pick < 0) {
-        for (i = 0; i < remaining.length; i++) {
-          if (bookOk(remaining[i].p) && (!needExplore || isExplore(remaining[i].p, user, now))) { pick = i; break; }
+        if (needExplore) {
+          /* 全量存活表中探索项分散于分数尾部，直接走探索链（同为 ranked 序，语义一致） */
+          for (i = expHead; i >= 0; i = expNxt[i]) {
+            if (bookOk(ranked[i])) { pick = i; break; }
+          }
+        } else {
+          for (i = aliveHead; i >= 0; i = nxt[i]) {
+            if (bookOk(ranked[i])) { pick = i; break; }
+          }
         }
       }
       if (pick < 0 && needExplore) {
         relaxed = 1; /* 放宽探索约束，仍保书约束 */
-        for (i = 0; i < remaining.length; i++) {
-          if (bookOk(remaining[i].p)) { pick = i; break; }
+        for (i = aliveHead; i >= 0; i = nxt[i]) {
+          if (bookOk(ranked[i])) { pick = i; break; }
         }
       }
       if (pick < 0) {
+        pick = aliveHead;
+        if (pick < 0) break;
         relaxed = 2; relaxedBookCount++; /* 书约束也无法满足，兜底 */
-        pick = 0;
       }
-      var item = remaining.splice(pick, 1)[0];
+      var item = ranked[pick];
+      unlink(pick);
+      b = item.b;
+      bCount[b]--;
       item.relaxed = relaxed;
       out.push(item);
+
+      /* 维护紧急书序（剩余数降序, 首现序升序）：仅消费之书剩余减少，需向后就位；
+         与原「每槽新鲜稳定排序」一致：越过剩余更多的书，以及剩余相同但首现更早的书；清零则移除。
+         bPos[] 免去每槽 indexOf 的 O(书数) 扫描（移除/换位时同步维护） */
+      var bi = bPos[b];
+      if (bCount[b] === 0) {
+        bookOrder.splice(bi, 1);
+        for (k = bi; k < bookOrder.length; k++) bPos[bookOrder[k]] = k;
+      } else {
+        while (bi + 1 < bookOrder.length) {
+          var nb = bookOrder[bi + 1];
+          if (bCount[nb] > bCount[b] || (bCount[nb] === bCount[b] && bRank[nb] < bRank[b])) {
+            bookOrder[bi] = nb;
+            bookOrder[bi + 1] = b;
+            bPos[b] = bi + 1;
+            bPos[nb] = bi;
+            bi++;
+          } else break;
+        }
+      }
     }
     return { out: out, relaxedBookCount: relaxedBookCount };
   }
@@ -235,16 +331,54 @@
     var maxDate = 0;
     passages.forEach(function (p) { if (p.publishedAt > maxDate) maxDate = p.publishedAt; });
 
-    var candidates = passages.filter(function (p) { return !has(user.hidden, p.passageId); })
-      .map(function (p) {
-        return { p: p, s: score(p, user, { now: now, maxPublishedAt: maxDate }), tie: random() };
-      })
-      .sort(function (a, b) { return b.s - a.s || b.tie - a.tie; });
+    /* 百本库：seen/hidden/liked/saved 随使用无上限增长，换 O(1) 成员查询，
+       防止「片段数 × 记录长」的逐条 indexOf 二次方扫描（只影响本函数局部，不改外部数据）；
+       空记录复用共享 shim，免 4 次 Set 分配 */
+    function fastSet(arr) {
+      if (!arr || arr.length === 0) return EMPTY_IDX_SHIM;
+      var s = new Set(arr);
+      return { indexOf: function (v) { return s.has(v) ? 0 : -1; } };
+    }
+    user.seen = fastSet(user.seen);
+    user.hidden = fastSet(user.hidden);
+    user.liked = fastSet(user.liked);
+    user.saved = fastSet(user.saved);
+
+    /* 百本库性能（4636 条池）：
+       - 主题权重按主题缓存：effectiveWeight 为纯函数（仅依赖 topic/user/now），
+         池中主题仅个位数，Math.pow 衰减从 O(条×主题) 次降为 O(主题) 次；
+       - filter+map 合并为单遍；
+       - affinity 每条只算一次，同时产出排序分与探索标记（exp 由 assemble 消费，
+         isExplore = affinity <= exploreAffinity，与旧实现逐槽计算语义一致） */
+    var topicW = {};
+    var qw = CONFIG.qualityWeight, fw = CONFIG.freshnessWeight, sp = CONFIG.seenPenalty, ea = CONFIG.exploreAffinity;
+    var hiddenSet = user.hidden, seenSet = user.seen;
+    var candidates = [];
+    for (var ci = 0; ci < passages.length; ci++) {
+      var p = passages[ci];
+      if (hiddenSet.indexOf(p.passageId) >= 0) continue;
+      var topics = p.topics || [], a = 0, wv;
+      for (var ti = 0; ti < topics.length; ti++) {
+        var t = topics[ti];
+        wv = topicW[t];
+        if (wv === undefined) { wv = effectiveWeight(user, t, now); topicW[t] = wv; }
+        if (wv > a) a = wv;
+      }
+      var q = p.qualityScore != null ? p.qualityScore : 0;
+      var fresh = (maxDate && p.publishedAt) ? Math.min(1, p.publishedAt / maxDate) : 0;
+      var seen = seenSet.indexOf(p.passageId) >= 0 ? 1 : 0;
+      candidates.push({ p: p, exp: a <= ea, tie: random(),
+        s: a + qw * q + fw * fresh - sp * seen });
+    }
+    candidates.sort(function (x, y) { return y.s - x.s || y.tie - x.tie; });
 
     var assembled = assemble(candidates, limit, user, now);
     return assembled.out.map(function (item) {
       var copy = Object.assign({}, item.p);
-      copy.recommendationReason = reasonFor(item.p, user, now);
+      copy.recommendationReason = reasonFor(item.p, user, now, topicW);
+      /* 组装元信息：0=正常逐槽贪心 1=探索约束豁免 2=书约束兜底（供评估/调试，
+         UI 不读取；百本库多轮反馈后探索池可能结构性耗尽，豁免必须显式可查） */
+      copy.relaxed = item.relaxed;
       return copy;
     });
   }
